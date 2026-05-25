@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Sync Spec Files",
+  "description": "當 requirements、tasks 或 design 其中一個被修改時，自動檢視其他兩個檔案是否需要一併更新以保持一致性。",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/specs/radar-monitoring-platform/requirements.md",
+      ".kiro/specs/radar-monitoring-platform/tasks.md",
+      ".kiro/specs/radar-monitoring-platform/design.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "其中一個 spec 檔案剛被手動修改了（requirements.md、tasks.md 或 design.md）。請讀取這三個檔案：\n- .kiro/specs/radar-monitoring-platform/requirements.md\n- .kiro/specs/radar-monitoring-platform/tasks.md\n- .kiro/specs/radar-monitoring-platform/design.md\n\n比對它們的內容，找出因為剛才的修改而造成的不一致之處，並告知使用者哪些地方需要一併更新，以及建議的修改內容。不要自動修改，只需提出建議。"
+  }
+}

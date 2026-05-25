@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>歷史資料 — 雷達監控整合平台</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .history-header-info {
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .history-header-info strong {
+      color: #e2e8f0;
+    }
+
+    .range-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .range-btn {
+      background: #1e2235;
+      color: #94a3b8;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      padding: 5px 16px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .range-btn:hover {
+      background: #2d3148;
+      color: #e2e8f0;
+    }
+    .range-btn.active {
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 280px;
+    }
+
+    .no-data {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+    .no-data.hidden { display: none; }
+
+    .system-charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      margin: 20px 24px;
+    }
+
+    .system-chart-card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .system-chart-card h3 {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #7dd3fc;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #2d3148;
+      padding-bottom: 6px;
+    }
+
+    .system-chart-wrapper {
+      position: relative;
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <a href="/instruments.html" class="back-link">← 儀器即時狀況</a>
+      <h1 id="page-title">歷史資料</h1>
+    </div>
+    <div class="time-bar">
+      <span class="history-header-info">IP：<strong id="header-ip">--</strong></span>
+      <span class="history-header-info">FileType：<strong id="header-filetype">--</strong></span>
+    </div>
+  </header>
+
+  <main>
+    <div id="status-bar" class="status-bar hidden"></div>
+
+    <!-- DiffTime 主圖 -->
+    <div class="section">
+      <h2>資料時間差（DiffTime）</h2>
+
+      <div class="range-bar">
+        <button class="range-btn" data-range="6h">6 小時</button>
+        <button class="range-btn active" data-range="1d">1 天</button>
+        <button class="range-btn" data-range="1w">1 週</button>
+        <button class="range-btn" data-range="1m">1 個月</button>
+        <button class="range-btn" data-range="3m">3 個月</button>
+      </div>
+
+      <div class="chart-wrapper">
+        <canvas id="diff-chart"></canvas>
+        <div id="diff-no-data" class="no-data hidden">此時間範圍內無資料</div>
+      </div>
+    </div>
+
+    <!-- 系統狀態圖 -->
+    <div class="system-charts-grid">
+      <div class="system-chart-card">
+        <h3>CPU 負載（Load_1）</h3>
+        <div class="system-chart-wrapper">
+          <canvas id="cpu-chart"></canvas>
+          <div id="cpu-no-data" class="no-data hidden">此時間範圍內無資料</div>
+        </div>
+      </div>
+
+      <div class="system-chart-card">
+        <h3>記憶體使用率（MemoryUSE %）</h3>
+        <div class="system-chart-wrapper">
+          <canvas id="memory-chart"></canvas>
+          <div id="memory-no-data" class="no-data hidden">此時間範圍內無資料</div>
+        </div>
+      </div>
+
+      <div class="system-chart-card">
+        <h3>磁碟使用率（Used %）</h3>
+        <div class="system-chart-wrapper">
+          <canvas id="disk-chart"></canvas>
+          <div id="disk-no-data" class="no-data hidden">此時間範圍內無資料</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/history.js"></script>
+</body>
+</html>

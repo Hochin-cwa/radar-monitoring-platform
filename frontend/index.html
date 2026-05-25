@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>雷達監控整合平台</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header>
+    <h1>雷達監控整合平台</h1>
+    <div class="time-bar">
+      <span>本地時間：<span id="local-time">--</span></span>
+      <span>UTC：<span id="utc-time">--</span></span>
+    </div>
+  </header>
+
+  <main class="home-main">
+    <div class="nav-cards">
+      <a href="/instruments.html" class="nav-card">
+        <div class="nav-card-icon">📡</div>
+        <div class="nav-card-title">儀器即時狀況</div>
+        <div class="nav-card-desc">查看各雷達儀器的即時資料時間差與警示狀態（依科別分組）</div>
+      </a>
+      <a href="/computers.html" class="nav-card">
+        <div class="nav-card-icon">🖥</div>
+        <div class="nav-card-title">電腦即時狀況</div>
+        <div class="nav-card-desc">查看各電腦系統的負載、記憶體與磁碟使用率（依科別分組）</div>
+      </a>
+      <a href="/settings.html" class="nav-card">
+        <div class="nav-card-icon">⚙️</div>
+        <div class="nav-card-title">儀器閾值設定</div>
+        <div class="nav-card-desc">設定各儀器的最大允許時間差閾值（分鐘）</div>
+      </a>
+    </div>
+  </main>
+
+  <script src="/js/clock.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pymysql
+pyyaml
+pydantic
+hypothesis
+pytest
+httpx
+pytest-mock
+cryptography

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>儀器閾值設定 — 雷達監控整合平台</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <a href="/" class="back-link">← 首頁</a>
+      <h1>儀器閾值設定</h1>
+    </div>
+    <div class="time-bar">
+      <span>本地時間：<span id="local-time">--</span></span>
+      <span>UTC：<span id="utc-time">--</span></span>
+    </div>
+  </header>
+
+  <main>
+    <div id="status-bar" class="status-bar hidden"></div>
+    <section class="section">
+      <h2>各儀器最大時間差閾值（分鐘）</h2>
+      <table id="threshold-table">
+        <thead>
+          <tr>
+            <th>儀器代碼</th>
+            <th>設備名稱</th>
+            <th style="color:#facc15">黃色閾值（分鐘）</th>
+            <th style="color:#fb923c">橙色閾值（分鐘）</th>
+            <th style="color:#ef4444">紅色閾值（分鐘）</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="threshold-tbody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>

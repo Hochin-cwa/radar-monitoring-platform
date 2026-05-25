@@ -1,0 +1,21 @@
+version: '3'
+services:
+  backend:
+    image: radar-backend:latest
+    expose:
+      - "8000"
+    volumes:
+      - /data/b615/radar-monitoring-platform/config:/app/config
+      - /data/b615/radar-monitoring-platform/logs:/app/logs
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - /data/b615/radar-monitoring-platform/deploy/nginx.conf:/etc/nginx/conf.d/default.conf
+      - /data/b615/radar-monitoring-platform/frontend:/usr/share/nginx/html
+    depends_on:
+      - backend
+    restart: unless-stopped

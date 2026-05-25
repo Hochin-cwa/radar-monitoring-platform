@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>電腦即時狀況 — 雷達監控整合平台</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <a href="/" class="back-link">← 首頁</a>
+      <h1>電腦即時狀況</h1>
+    </div>
+    <div class="time-bar">
+      <span>本地時間：<span id="local-time">--</span></span>
+      <span>UTC：<span id="utc-time">--</span></span>
+      <span class="refresh-info">
+        上次更新：<span id="last-refreshed">--</span>
+        <button id="btn-refresh">⟳ 刷新</button>
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <div id="status-bar" class="status-bar hidden"></div>
+
+    <section class="section">
+      <h2>電腦即時狀況</h2>
+      <div id="computers-container">
+        <p class="loading">載入中…</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/computers.js"></script>
+</body>
+</html>

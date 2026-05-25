@@ -1,0 +1,90 @@
+================================================================
+Python 檔案說明文字檔總覽
+================================================================
+
+每個說明文字檔與其對應的原始 Python 檔案如下：
+
+┌─────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────────────┐
+│ 原始 Python 檔案                                            │ 說明文字檔                                                   │
+├─────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+│ backend/main.py                                             │ backend/main_說明.txt                                        │
+│ backend/config.py                                           │ backend/config_說明.txt                                      │
+│ backend/database.py                                         │ backend/database_說明.txt                                    │
+│ backend/models.py                                           │ backend/models_說明.txt                                      │
+│ backend/routers/completeness.py                             │ backend/routers/completeness_說明.txt                        │
+│ backend/routers/instruments.py                              │ backend/routers/instruments_說明.txt                         │
+│ backend/routers/system.py                                   │ backend/routers/system_說明.txt                              │
+│ backend/services/alert_service.py                           │ backend/services/alert_service_說明.txt                      │
+│ backend/services/completeness_service.py                    │ backend/services/completeness_service_說明.txt               │
+│ backend/services/system_service.py                          │ backend/services/system_service_說明.txt                     │
+│ conftest.py                                                 │ conftest_說明.txt                                            │
+│ tests/integration/test_api.py                               │ tests/integration/test_api_說明.txt                          │
+│ tests/integration/test_db_access.py                         │ tests/integration/test_db_access_說明.txt                    │
+│ tests/unit/test_database.py                                 │ tests/unit/test_database_說明.txt                            │
+└─────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────────────┘
+
+共 14 個說明文字檔。
+
+================================================================
+各說明文字檔內容摘要
+================================================================
+
+backend/main_說明.txt
+  FastAPI 應用程式進入點。說明日誌系統設定（RotatingFileHandler）、
+  FastAPI 實例建立、三個路由器的掛載，以及前端靜態檔案服務。
+
+backend/config_說明.txt
+  設定載入器。說明 YAML 解析流程、四個 dataclass（DatabaseConfig、
+  SystemConfig、InstrumentConfig、AppConfig）的欄位意義，
+  以及 Singleton 模式確保設定只讀取一次。
+
+backend/database_說明.txt
+  SQLAlchemy 連線池管理。說明三個資料庫的延遲初始化（Lazy Init）、
+  get_session() context manager 的 commit/rollback/close 機制，
+  以及 check_connection() 的重試邏輯。
+
+backend/models_說明.txt
+  Pydantic 資料模型定義。說明七個模型的欄位意義與驗證規則，
+  包含 Literal 型別限制、Field(ge=0) 驗證，以及各模型對應的 API 端點。
+
+backend/routers/completeness_說明.txt
+  /api/v1/completeness/* 路由層。說明兩個端點的輸入驗證、
+  預設時間範圍計算（24 小時），以及 503/422 錯誤回應條件。
+
+backend/routers/instruments_說明.txt
+  /api/v1/instruments/* 路由層。說明儀器列表查詢與閾值更新端點，
+  包含 404（儀器不存在）與 422（負數閾值）的驗證邏輯。
+
+backend/routers/system_說明.txt
+  /api/v1/system/current 和 /api/v1/disk/current 路由層。
+  說明為何此路由器不設定 prefix，以及降級時回傳空列表的設計。
+
+backend/services/alert_service_說明.txt
+  儀器警報服務。說明 SQL LEFT JOIN 邏輯、記憶體閾值字典的
+  Lazy Init 與動態更新機制，以及 NULL 資料視為警報的設計原因。
+
+backend/services/completeness_service_說明.txt
+  完整率計算服務。說明兩個 SQL 查詢的計算邏輯（NULLIF 防除零、
+  FLOOR 取整預期筆數）、_clamp 函式、以及 DB 失敗時的 fallback 機制。
+
+backend/services/system_service_說明.txt
+  系統與磁碟狀態服務。說明兩個資料庫查詢的欄位對應、
+  NULL 值處理，以及 EquipmentName or IP 的顯示名稱備用邏輯。
+
+conftest_說明.txt
+  pytest 根設定檔。說明 sys.path.insert(0, ...) 確保
+  所有測試子目錄都能 import backend 套件的原理。
+
+tests/integration/test_api_說明.txt
+  API 整合測試。說明 TestClient 的使用方式、patch() 替換服務層
+  的目標路徑規則，以及各測試類別覆蓋的端點與驗證場景。
+
+tests/integration/test_db_access_說明.txt
+  資料庫整合測試。說明 pytest.skip 優雅略過無法連線環境的機制、
+  autouse fixture 的用途，以及資料完整性驗證（DiffTime 非負、
+  MemoryUSE 在 0~100）的設計依據。
+
+tests/unit/test_database_說明.txt
+  database.py 單元測試。說明 MagicMock 注入模擬 Engine/Session 的
+  方法、side_effect 列表模擬連續呼叫結果，以及 call() 物件
+  比對 sleep 呼叫參數的技巧。

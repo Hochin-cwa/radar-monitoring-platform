@@ -1,0 +1,450 @@
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0f1117;
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  background: #1a1d27;
+  border-bottom: 1px solid #2d3148;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+header h1 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #7dd3fc;
+}
+
+.time-bar {
+  display: flex;
+  gap: 20px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.time-bar span span { color: #e2e8f0; font-variant-numeric: tabular-nums; }
+
+.refresh-info { display: flex; align-items: center; gap: 8px; }
+
+/* ── Buttons ── */
+button {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+button:hover { background: #1d4ed8; }
+
+/* ── Status bar ── */
+.status-bar {
+  margin: 12px 24px 0;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+.status-bar.error   { background: #7f1d1d; color: #fca5a5; }
+.status-bar.warning { background: #78350f; color: #fcd34d; }
+.status-bar.hidden  { display: none; }
+
+/* ── Sections ── */
+.section {
+  margin: 20px 24px;
+  background: #1a1d27;
+  border: 1px solid #2d3148;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.section h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #7dd3fc;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #2d3148;
+  padding-bottom: 8px;
+}
+
+/* ── Dept filter bar ── */
+.dept-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 24px 0;
+}
+
+.dept-btn {
+  background: #1e2235;
+  color: #94a3b8;
+  border: 1px solid #2d3148;
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dept-btn:hover {
+  background: #2d3148;
+  color: #e2e8f0;
+}
+.dept-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+/* ── Instruments grid ── */
+.instruments-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.instrument-group {
+  border: 1px solid #2d3148;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.group-header {
+  background: #1e2235;
+  color: #7dd3fc;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.group-summary {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #94a3b8;
+  letter-spacing: 0;
+}
+
+.summary-normal {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.group-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.instrument-card {
+  background: #0f1117;
+  border: 1px solid #2d3148;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.instrument-card.alert {
+  border-color: #ef4444;
+  background: #1c0a0a;
+}
+
+.instrument-card .card-title {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.instrument-card .card-meta {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.instrument-card .card-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.instrument-card .diff-time {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Instrument card levels ── */
+.instrument-card.level-ok           { border-color: #2d3148; background: #0f1117; }
+.instrument-card.level-alert-yellow { border-color: #ca8a04; background: #1c1500; }
+.instrument-card.level-alert-orange { border-color: #ea580c; background: #1c0a00; }
+.instrument-card.level-alert-red    { border-color: #ef4444; background: #1c0a0a; }
+.instrument-card.level-disconnected { border-color: #6b7280; background: #111318; }
+
+.diff-time { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.diff-ok           { color: #4ade80; }
+.diff-alert-yellow { color: #facc15; }
+.diff-alert-orange { color: #fb923c; }
+.diff-alert-red    { color: #ef4444; }
+.diff-disconnected { color: #9ca3af; font-size: 1.2rem; font-weight: 700; }
+
+.badge-alert-yellow { display:inline-block; margin-top:6px; background:#854d0e; color:#fef08a; font-size:0.72rem; padding:2px 8px; border-radius:4px; }
+.badge-alert-orange { display:inline-block; margin-top:6px; background:#9a3412; color:#fed7aa; font-size:0.72rem; padding:2px 8px; border-radius:4px; }
+.badge-alert-red    { display:inline-block; margin-top:6px; background:#7f1d1d; color:#fca5a5; font-size:0.72rem; padding:2px 8px; border-radius:4px; }
+.badge-disconnected { display:inline-block; margin-top:6px; background:#374151; color:#d1d5db; font-size:0.72rem; padding:2px 8px; border-radius:4px; }
+
+.instrument-card .alert-label {
+  display: inline-block;
+  margin-top: 6px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.instrument-card .ok-label {
+  display: inline-block;
+  margin-top: 6px;
+  background: #166534;
+  color: #bbf7d0;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.instrument-card .triggered-at {
+  font-size: 0.72rem;
+  color: #f87171;
+  margin-top: 4px;
+}
+
+/* ── Normal instruments collapsible summary ── */
+.normal-summary-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 4px;
+  padding: 10px 14px;
+  background: #052e16;
+  border: 1px solid #16a34a;
+  border-radius: 8px;
+  color: #4ade80;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.normal-summary-box:hover {
+  background: #064e24;
+  border-color: #22c55e;
+}
+.normal-summary-icon {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+.normal-summary-box.expanded .normal-summary-icon {
+  transform: rotate(90deg);
+}
+
+.normal-cards-collapse {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+.normal-cards-collapse.open {
+  display: grid;
+}
+
+/* ── Chart ── */
+.chart-controls {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.chart-controls label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  gap: 4px;
+}
+
+.chart-controls input[type="datetime-local"] {
+  background: #0f1117;
+  border: 1px solid #2d3148;
+  border-radius: 6px;
+  color: #e2e8f0;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+}
+
+.chart-wrapper { position: relative; height: 280px; }
+
+.no-data {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+.no-data.hidden { display: none; }
+
+/* ── Threshold table ── */
+#threshold-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+#threshold-table th {
+  text-align: left;
+  padding: 8px 12px;
+  color: #94a3b8;
+  border-bottom: 1px solid #2d3148;
+}
+
+#threshold-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #1e2235;
+}
+
+#threshold-table input[type="number"] {
+  width: 90px;
+  background: #0f1117;
+  border: 1px solid #2d3148;
+  border-radius: 4px;
+  color: #e2e8f0;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+
+#threshold-table input.input-error { border-color: #ef4444; }
+
+.btn-save {
+  background: #059669;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+.btn-save:hover { background: #047857; }
+
+.save-msg {
+  font-size: 0.75rem;
+  margin-left: 6px;
+}
+.save-msg.ok  { color: #4ade80; }
+.save-msg.err { color: #f87171; }
+
+/* ── Misc ── */
+.loading { color: #64748b; font-size: 0.88rem; }
+
+/* ── Home nav cards ── */
+.home-main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 60px);
+}
+
+.nav-cards {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 24px;
+}
+
+.nav-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #1a1d27;
+  border: 1px solid #2d3148;
+  border-radius: 14px;
+  padding: 36px 40px;
+  width: 240px;
+  text-decoration: none;
+  color: #e2e8f0;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.nav-card:hover {
+  border-color: #7dd3fc;
+  transform: translateY(-3px);
+}
+.nav-card-icon { font-size: 2.8rem; margin-bottom: 14px; }
+.nav-card-title { font-size: 1.1rem; font-weight: 600; color: #7dd3fc; margin-bottom: 8px; }
+.nav-card-desc  { font-size: 0.8rem; color: #64748b; text-align: center; line-height: 1.5; }
+
+/* ── Header with back link ── */
+.header-left { display: flex; align-items: center; gap: 12px; }
+.back-link {
+  color: #7dd3fc;
+  text-decoration: none;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.back-link:hover { text-decoration: underline; }
+
+/* ── Computer status card extras ── */
+.badge-ok {
+  display: inline-block;
+  margin-top: 6px;
+  background: #166534;
+  color: #bbf7d0;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.metric-label { color: #94a3b8; }
+.metric-value  { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* value colour by alert level */
+.diff-alert-ok     { color: #4ade80; }
+.diff-alert-yellow { color: #facc15; }
+.diff-alert-orange { color: #fb923c; }
+.diff-alert-red    { color: #ef4444; }
+
+/* card border/background by alert level */
+.instrument-card.level-alert-yellow { border-color: #ca8a04; background: #1c1500; }
+.instrument-card.level-alert-orange { border-color: #ea580c; background: #1c0a00; }
+.instrument-card.level-alert-red    { border-color: #ef4444; background: #1c0a0a; }
