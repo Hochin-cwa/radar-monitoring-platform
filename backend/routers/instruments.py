@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from backend.models import (
     InstrumentIntervalSetting, InstrumentListItem, InstrumentListResponse,
-    ThresholdUpdateResponse,
+    ThresholdDirectSetting, ThresholdUpdateResponse,
 )
 from backend.services.alert_service import (
     calculate_thresholds, get_instrument_thresholds,
-    list_instruments, set_instrument_thresholds,
+    list_instruments, set_instrument_thresholds, set_instrument_thresholds_direct,
 )
 
 logger = logging.getLogger("routers.instruments")
@@ -38,7 +38,7 @@ def get_instruments() -> InstrumentListResponse:
 
 @router.post("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
 @router.put("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
-def update_threshold(file_type: str, body: InstrumentIntervalSetting) -> ThresholdUpdateResponse:
+def update_threshold(file_type: str, body: ThresholdDirectSetting) -> ThresholdUpdateResponse:
     # 只在 DB 可用時驗證 file_type 是否存在；DB 不可用時直接允許更新
     instruments = list_instruments()
     if instruments:
@@ -46,14 +46,15 @@ def update_threshold(file_type: str, body: InstrumentIntervalSetting) -> Thresho
         if file_type not in known:
             raise HTTPException(status_code=404, detail=f"找不到儀器: {file_type}")
 
-    set_instrument_thresholds(file_type, body.interval_minutes)
-    t_yellow, t_orange, t_red = calculate_thresholds(body.interval_minutes)
+    set_instrument_thresholds_direct(
+        file_type, body.threshold_yellow, body.threshold_orange, body.threshold_red
+    )
 
     return ThresholdUpdateResponse(
         file_type=file_type,
-        interval_minutes=body.interval_minutes,
-        threshold_yellow=t_yellow,
-        threshold_orange=t_orange,
-        threshold_red=t_red,
+        interval_minutes=body.threshold_yellow,  # 以 yellow 作為近似 interval 參考
+        threshold_yellow=body.threshold_yellow,
+        threshold_orange=body.threshold_orange,
+        threshold_red=body.threshold_red,
         updated_at=datetime.now(timezone.utc),
     )
