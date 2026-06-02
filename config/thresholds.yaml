@@ -1,15 +1,55 @@
-# 各儀器警示閾值設定（分鐘）
-# 修改後重啟服務或透過網頁設定介面更新
-# 若儀器不在此清單中，使用 defaults.interval_minutes 的預設值
-#
-# 系統自動計算三段閾值：
-#   threshold_yellow = interval_minutes + 5
-#   threshold_orange = interval_minutes + 10
-#   threshold_red    = interval_minutes + 20
-#
-# 預設 interval_minutes = 7 → yellow=12, orange=17, red=27
-
 defaults:
-  interval_minutes: 7
-
-instruments: {}
+  interval_minutes: 7.0
+instruments:
+  DS_gfsefs:
+    threshold_orange: 4000.0
+    threshold_red: 6000.0
+    threshold_yellow: 2000.0
+  DS_skewt:
+    threshold_orange: 4000.0
+    threshold_red: 6000.0
+    threshold_yellow: 2000.0
+  HFradar_bg00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_dj00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_dt00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_gy00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_sl00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_ya00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_ya01:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  RCCL_asd_60:
+    threshold_orange: 70.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
+  RCCL_bufr_60:
+    threshold_orange: 70.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
+  RCDS_asd_60:
+    threshold_orange: 70.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
+  RCDS_bufr_60:
+    threshold_orange: 70.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
