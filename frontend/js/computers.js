@@ -9,6 +9,9 @@
 
 const REFRESH_INTERVAL_MS = 60_000;
 let _refreshTimer = null;
+let _activeDept = 'all';
+let _lastItems = null;
+let _lastDiskError = false;
 
 const DEPT_LABELS = {
   sos:  '衛星作業科',
@@ -179,22 +182,40 @@ function _renderUnifiedCard(item) {
 
 /**
  * 依科別分組渲染所有統一卡片，寫入 #computers-container
- * @param {Array}   items      ComputerItem 陣列
- * @param {boolean} diskError  DiskStatus 資料庫是否無法連線
+ * @param {Array|null}  items      ComputerItem 陣列（null 表示使用快取重繪）
+ * @param {boolean}     diskError  DiskStatus 資料庫是否無法連線
  */
 function _renderUnifiedGrid(items, diskError) {
+  // 有新資料時更新快取；篩選重繪時傳 null 使用快取
+  if (items !== null) {
+    _lastItems = items;
+    _lastDiskError = diskError;
+  }
+  const source = _lastItems;
+  const useDiskError = _lastDiskError;
+
   const container = document.getElementById('computers-container');
 
-  if (!items || items.length === 0) {
+  if (!source || source.length === 0) {
     container.innerHTML = '<p class="loading">目前無電腦資料</p>';
     return;
   }
 
-  const diskBanner = diskError
+  // 依篩選過濾
+  const filtered = _activeDept === 'all'
+    ? source
+    : source.filter(i => (i.department || '').toLowerCase() === _activeDept);
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p class="loading">此科別目前無電腦資料</p>';
+    return;
+  }
+
+  const diskBanner = useDiskError
     ? '<div class="disk-error-banner">⚠ 磁碟資料庫無法連線，磁碟資訊暫時不可用</div>'
     : '';
 
-  const groups = _groupByDept(items);
+  const groups = _groupByDept(filtered);
   const groupsHtml = _orderedKeys(groups).map(key => {
     const label = DEPT_LABELS[key] || key;
     const cards = groups[key].map(item => _renderUnifiedCard(item)).join('');
@@ -234,6 +255,17 @@ async function _init() {
     _refreshData();
     _resetRefreshTimer();
   });
+
+  // 科別篩選按鈕
+  document.querySelectorAll('.dept-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.dept-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _activeDept = btn.dataset.dept;
+      _renderUnifiedGrid(null, _lastDiskError);
+    });
+  });
+
   await _refreshData();
   _resetRefreshTimer();
 }
