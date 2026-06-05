@@ -18,8 +18,12 @@ logger = logging.getLogger("history_service")
 
 
 def _parse_range(range_str: str) -> datetime:
-    """Return the start datetime (UTC) for the given range string."""
-    now = datetime.now(tz=timezone.utc)
+    """Return the start datetime for the given range string.
+
+    Returns a naive (no timezone) datetime using the local server time,
+    to match MySQL datetime columns that store local time without timezone info.
+    """
+    now = datetime.now()
     mapping = {
         "6h": timedelta(hours=6),
         "1d": timedelta(days=1),
@@ -31,8 +35,21 @@ def _parse_range(range_str: str) -> datetime:
     return now - delta
 
 
+_STATUS_TABLES = [
+    "radarStatus",
+    "windprofilerStatus",
+    "HFradarStatus",
+    "satelliteStatus",
+    "DSStatus",
+]
+
+
 def _table_for_file_type(file_type: str) -> str:
-    """Return the history table name for the given file_type."""
+    """Return the best-guess history table name for the given file_type.
+
+    Used as a priority hint — the actual query will fall through all tables
+    if the guessed table returns no data.
+    """
     ft = file_type
     if ft.startswith("DS_"):
         return "DSStatus"
@@ -46,38 +63,54 @@ def _table_for_file_type(file_type: str) -> str:
 
 
 def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
-    """Query instrument DiffTime history from the appropriate status table."""
-    table = _table_for_file_type(file_type)
+    """Query instrument DiffTime history from status tables.
+
+    Tries the best-guess table first; if no data is found, queries remaining
+    tables until data is found.
+    """
     start_dt = _parse_range(range)
     start_ts = start_dt.timestamp()
 
     timeout = get_config().system.query_timeout_seconds
     t_yellow, t_orange, t_red = get_instrument_thresholds(file_type)
 
-    sql = text(f"""
-        SELECT FileTime, DiffTime
-        FROM {table}
-        WHERE IP = :ip
-          AND FileType = :file_type
-          AND FileTime >= :start_ts
-        ORDER BY FileTime ASC
-    """)  # nosec — table name is controlled internally, not user input
+    # Order tables: best guess first, then the rest
+    guessed = _table_for_file_type(file_type)
+    tables_to_try = [guessed] + [t for t in _STATUS_TABLES if t != guessed]
 
-    try:
-        with get_session("file_status") as session:
-            rows = session.execute(
-                sql.execution_options(timeout=timeout),
-                {"ip": ip, "file_type": file_type, "start_ts": start_ts},
-            ).fetchall()
-    except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_instrument_history: DB error: %s", exc)
-        rows = []
+    rows = []
+    for table in tables_to_try:
+        sql = text(f"""
+            SELECT FileTime, DiffTime
+            FROM {table}
+            WHERE IP = :ip
+              AND FileType = :file_type
+              AND FileTime >= :start_ts
+            ORDER BY FileTime ASC
+        """)  # nosec — table name is controlled internally, not user input
+
+        try:
+            with get_session("file_status") as session:
+                rows = session.execute(
+                    sql.execution_options(timeout=timeout),
+                    {"ip": ip, "file_type": file_type, "start_ts": start_ts},
+                ).fetchall()
+        except (OperationalError, SQLAlchemyError) as exc:
+            logger.warning("get_instrument_history: table '%s' query error: %s", table, exc)
+            rows = []
+
+        if rows:
+            logger.info(
+                "get_instrument_history: found %d rows in table '%s' for %s/%s",
+                len(rows), table, file_type, ip,
+            )
+            break
 
     data = []
     for row in rows:
         if row.FileTime is None:
             continue
-        dt = datetime.fromtimestamp(float(row.FileTime), tz=timezone.utc)
+        dt = datetime.fromtimestamp(float(row.FileTime))
         data.append({
             "time": dt.isoformat(),
             # DiffTime 欄位單位為秒，換算成分鐘後回傳
@@ -131,7 +164,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 continue
             t = row.ServerTime
             if isinstance(t, datetime):
-                t_iso = t.replace(tzinfo=timezone.utc).isoformat() if t.tzinfo is None else t.isoformat()
+                t_iso = t.isoformat()
             else:
                 t_iso = str(t)
             cpu_data.append({
@@ -156,7 +189,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 continue
             t = row.ServerTime
             if isinstance(t, datetime):
-                t_iso = t.replace(tzinfo=timezone.utc).isoformat() if t.tzinfo is None else t.isoformat()
+                t_iso = t.isoformat()
             else:
                 t_iso = str(t)
             disk_data.append({
