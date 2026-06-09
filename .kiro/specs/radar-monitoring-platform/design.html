@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>design</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--muted:#59636e;--border:#d1d9e0;--code-bg:#f6f8fa;--accent:#0969da;--stripe:#f6f8fa}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9198a1;--border:#30363d;--code-bg:#161b22;--accent:#4493f8;--stripe:#161b22}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;display:flex;align-items:flex-start}
+.toc{flex:0 0 264px;width:264px;position:sticky;top:0;max-height:100vh;overflow:auto;padding:24px 12px 40px;border-right:1px solid var(--border);font-size:13.5px;line-height:1.5}
+.toc a{display:block;padding:3px 10px;margin:1px 0;color:var(--muted);text-decoration:none;border-left:2px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toc a:hover{color:var(--fg);background:var(--code-bg)}
+.toc .l1{font-weight:600}.toc .l2{padding-left:22px}.toc .l3{padding-left:34px;font-size:13px}
+.markdown-body{flex:1;min-width:0;max-width:860px;margin:0 auto;padding:32px 40px 80px;word-wrap:break-word}
+.markdown-body h1,.markdown-body h2{border-bottom:1px solid var(--border);padding-bottom:.3em}
+.markdown-body h1,.markdown-body h2,.markdown-body h3,.markdown-body h4{margin-top:1.4em;margin-bottom:.6em;font-weight:600;line-height:1.25}
+.markdown-body a{color:var(--accent);text-decoration:none}.markdown-body a:hover{text-decoration:underline}
+.markdown-body code{background:var(--code-bg);padding:.2em .4em;border-radius:6px;font-size:85%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.markdown-body pre{background:var(--code-bg);padding:16px;border-radius:8px;overflow:auto;line-height:1.45}
+.markdown-body pre code{background:transparent;padding:0;font-size:90%}
+.markdown-body blockquote{margin:0;padding:0 1em;color:var(--muted);border-left:4px solid var(--border)}
+.markdown-body table{border-collapse:collapse;display:block;width:max-content;max-width:100%;overflow:auto;margin:1em 0}
+.markdown-body th,.markdown-body td{border:1px solid var(--border);padding:6px 13px}
+.markdown-body tr:nth-child(2n){background:var(--stripe)}
+.markdown-body img{max-width:100%}
+.markdown-body hr{border:none;border-top:1px solid var(--border);margin:1.6em 0}
+.markdown-body .task-list-item{list-style:none}
+.markdown-body .task-list-item input{margin:0 .4em .25em -1.4em}
+.markdown-body pre.mermaid{background:transparent;text-align:center;padding:8px 0}
+</style>
+<style>pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:3px 5px}/*!
+  Theme: GitHub
+  Description: Light theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-light
+  Current colors taken from GitHub's CSS
+*/.hljs{color:#24292e;background:#fff}.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_{color:#d73a49}.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_{color:#6f42c1}.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-variable,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id{color:#005cc5}.hljs-regexp,.hljs-string,.hljs-meta .hljs-string{color:#032f62}.hljs-built_in,.hljs-symbol{color:#e36209}.hljs-comment,.hljs-code,.hljs-formula{color:#6a737d}.hljs-name,.hljs-quote,.hljs-selector-tag,.hljs-selector-pseudo{color:#22863a}.hljs-subst{color:#24292e}.hljs-section{color:#005cc5;font-weight:700}.hljs-bullet{color:#735c0f}.hljs-emphasis{color:#24292e;font-style:italic}.hljs-strong{color:#24292e;font-weight:700}.hljs-addition{color:#22863a;background-color:#f0fff4}.hljs-deletion{color:#b31d28;background-color:#ffeef0}</style>
+</head>
+<body>
+<nav class="toc">
+<a class="l1" href="#h-0">技術設計文件：雷達監控整合平台</a>
+<a class="l2" href="#h-1">概覽</a>
+<a class="l2" href="#h-2">架構</a>
+<a class="l3" href="#h-3">整體架構圖</a>
+<a class="l3" href="#h-4">部署架構</a>
+<a class="l2" href="#h-5">專案目錄結構</a>
+<a class="l2" href="#h-6">元件與介面</a>
+<a class="l3" href="#h-7">後端元件</a>
+<a class="l3" href="#h-8">前端元件</a>
+<a class="l2" href="#h-9">API 設計</a>
+<a class="l3" href="#h-10">基礎路徑：/api/v1</a>
+<a class="l2" href="#h-11">資料模型</a>
+<a class="l3" href="#h-12">現有資料庫結構（唯讀存取）</a>
+<a class="l3" href="#h-13">閾值設定（thresholds.yaml）</a>
+<a class="l3" href="#h-14">儀器狀態顏色規則</a>
+<a class="l3" href="#h-15">Pydantic 模型</a>
+<a class="l2" href="#h-16">測試策略</a>
+<a class="l2" href="#h-17">異常判定標準與告警機制</a>
+<a class="l3" href="#h-18">檔案到位判定標準</a>
+<a class="l3" href="#h-19">硬體警戒門檻</a>
+<a class="l3" href="#h-20">異常分級與燈號</a>
+</nav>
+<article class="markdown-body">
+<h1 id="h-0">技術設計文件：雷達監控整合平台</h1>
+<h2 id="h-1">概覽</h2>
+<p>雷達監控整合平台是一套前後端分離的網頁應用系統，部署於 Linux Rocky 9 環境。後端以 Python（FastAPI）提供 REST API，前端以純 HTML/CSS/JavaScript 實作 Dashboard，資料來源為 MySQL 資料庫。系統核心功能為即時顯示各儀器資料時間差（以顏色區分嚴重程度）與電腦系統狀態。資料異常的主動推播通知由外部系統負責，本平台僅負責視覺化呈現。</p>
+<hr>
+<h2 id="h-2">架構</h2>
+<h3 id="h-3">整體架構圖</h3>
+<pre class="mermaid" data-processed="true"><svg id="mermaid-1780626020865" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 557.984375px;" viewBox="0 0 557.984375 547" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#mermaid-1780626020865{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#mermaid-1780626020865 .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#mermaid-1780626020865 .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#mermaid-1780626020865 .error-icon{fill:#552222;}#mermaid-1780626020865 .error-text{fill:#552222;stroke:#552222;}#mermaid-1780626020865 .edge-thickness-normal{stroke-width:1px;}#mermaid-1780626020865 .edge-thickness-thick{stroke-width:3.5px;}#mermaid-1780626020865 .edge-pattern-solid{stroke-dasharray:0;}#mermaid-1780626020865 .edge-thickness-invisible{stroke-width:0;fill:none;}#mermaid-1780626020865 .edge-pattern-dashed{stroke-dasharray:3;}#mermaid-1780626020865 .edge-pattern-dotted{stroke-dasharray:2;}#mermaid-1780626020865 .marker{fill:#333333;stroke:#333333;}#mermaid-1780626020865 .marker.cross{stroke:#333333;}#mermaid-1780626020865 svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#mermaid-1780626020865 p{margin:0;}#mermaid-1780626020865 .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#mermaid-1780626020865 .cluster-label text{fill:#333;}#mermaid-1780626020865 .cluster-label span{color:#333;}#mermaid-1780626020865 .cluster-label span p{background-color:transparent;}#mermaid-1780626020865 .label text,#mermaid-1780626020865 span{fill:#333;color:#333;}#mermaid-1780626020865 .node rect,#mermaid-1780626020865 .node circle,#mermaid-1780626020865 .node ellipse,#mermaid-1780626020865 .node polygon,#mermaid-1780626020865 .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#mermaid-1780626020865 .rough-node .label text,#mermaid-1780626020865 .node .label text,#mermaid-1780626020865 .image-shape .label,#mermaid-1780626020865 .icon-shape .label{text-anchor:middle;}#mermaid-1780626020865 .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#mermaid-1780626020865 .rough-node .label,#mermaid-1780626020865 .node .label,#mermaid-1780626020865 .image-shape .label,#mermaid-1780626020865 .icon-shape .label{text-align:center;}#mermaid-1780626020865 .node.clickable{cursor:pointer;}#mermaid-1780626020865 .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#mermaid-1780626020865 .arrowheadPath{fill:#333333;}#mermaid-1780626020865 .edgePath .path{stroke:#333333;stroke-width:1px;}#mermaid-1780626020865 .flowchart-link{stroke:#333333;fill:none;}#mermaid-1780626020865 .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#mermaid-1780626020865 .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#mermaid-1780626020865 .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#mermaid-1780626020865 .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#mermaid-1780626020865 .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#mermaid-1780626020865 .cluster text{fill:#333;}#mermaid-1780626020865 .cluster span{color:#333;}#mermaid-1780626020865 div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#mermaid-1780626020865 .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#mermaid-1780626020865 rect.text{fill:none;stroke-width:0;}#mermaid-1780626020865 .icon-shape,#mermaid-1780626020865 .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#mermaid-1780626020865 .icon-shape p,#mermaid-1780626020865 .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#mermaid-1780626020865 .icon-shape .label rect,#mermaid-1780626020865 .image-shape .label rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#mermaid-1780626020865 .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#mermaid-1780626020865 .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#mermaid-1780626020865 .node .neo-node{stroke:#9370DB;}#mermaid-1780626020865 [data-look="neo"].node rect,#mermaid-1780626020865 [data-look="neo"].cluster rect,#mermaid-1780626020865 [data-look="neo"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#mermaid-1780626020865 [data-look="neo"].node path{stroke:#9370DB;stroke-width:1px;}#mermaid-1780626020865 [data-look="neo"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#mermaid-1780626020865 [data-look="neo"].node .neo-line path{stroke:#9370DB;filter:none;}#mermaid-1780626020865 [data-look="neo"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#mermaid-1780626020865 [data-look="neo"].node circle .state-start{fill:#000000;}#mermaid-1780626020865 [data-look="neo"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#mermaid-1780626020865 [data-look="neo"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#mermaid-1780626020865 :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="mermaid-1780626020865_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="mermaid-1780626020865_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="mermaid-1780626020865_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></path></marker><marker id="mermaid-1780626020865_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></polygon></marker><marker id="mermaid-1780626020865_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="mermaid-1780626020865_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="mermaid-1780626020865_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="mermaid-1780626020865_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"></circle></marker><marker id="mermaid-1780626020865_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="mermaid-1780626020865_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="mermaid-1780626020865_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"></path></marker><marker id="mermaid-1780626020865_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"><g class="cluster" id="mermaid-1780626020865-資料庫伺服器" data-look="classic"><rect style="" x="419.13021087646484" y="387" width="130.85416793823242" height="152"></rect><g class="cluster-label" transform="translate(436.55729484558105, 387)"><foreignObject width="96" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5;"><span class="nodeLabel"><p>資料庫伺服器</p></span></div></foreignObject></g></g><g class="cluster" id="mermaid-1780626020865-subGraph1" data-look="classic"><rect style="" x="8" y="210" width="391.13021087646484" height="329"></rect><g class="cluster-label" transform="translate(133.98176956176758, 210)"><foreignObject width="139.1666717529297" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5;"><span class="nodeLabel"><p>應用伺服器 Rocky 9</p></span></div></foreignObject></g></g><g class="cluster" id="mermaid-1780626020865-瀏覽器" data-look="classic"><rect style="" x="113.65364646911621" y="8" width="244.96875" height="128"></rect><g class="cluster-label" transform="translate(212.1380214691162, 8)"><foreignObject width="48" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5;"><span class="nodeLabel"><p>瀏覽器</p></span></div></foreignObject></g></g></g><g class="edgePaths"><path d="M236.138,111L236.138,115.167C236.138,119.333,236.138,127.667,236.138,138C236.138,148.333,236.138,160.667,236.138,173C236.138,185.333,236.138,197.667,236.138,207.333C236.138,217,236.138,224,236.138,227.5L236.138,231" id="mermaid-1780626020865-L_UI_API_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_UI_API_0" data-points="W3sieCI6MjM2LjEzODAyMTQ2OTExNjIsInkiOjExMX0seyJ4IjoyMzYuMTM4MDIxNDY5MTE2MiwieSI6MTM2fSx7IngiOjIzNi4xMzgwMjE0NjkxMTYyLCJ5IjoxNzN9LHsieCI6MjM2LjEzODAyMTQ2OTExNjIsInkiOjIxMH0seyJ4IjoyMzYuMTM4MDIxNDY5MTE2MiwieSI6MjM1fV0=" data-look="classic" marker-end="url(#mermaid-1780626020865_flowchart-v2-pointEnd)"></path><path d="M268.538,313L273.661,319.167C278.784,325.333,289.03,337.667,294.153,350C299.276,362.333,299.276,374.667,324.468,391.167C349.661,407.667,400.045,428.334,425.237,438.668L450.429,449.001" id="mermaid-1780626020865-L_API_DB_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_API_DB_0" data-points="W3sieCI6MjY4LjUzNzc5NTY0NDA1NzQ0LCJ5IjozMTN9LHsieCI6Mjk5LjI3NjA0MjkzODIzMjQsInkiOjM1MH0seyJ4IjoyOTkuMjc2MDQyOTM4MjMyNCwieSI6Mzg3fSx7IngiOjQ1NC4xMzAyMTA4NzY0NjQ4NCwieSI6NDUwLjUxOTE5OTI4Mjk5NDl9XQ==" data-look="classic" marker-end="url(#mermaid-1780626020865_flowchart-v2-pointEnd)"></path><path d="M203.738,313L198.615,319.167C193.492,325.333,183.246,337.667,178.123,350C173,362.333,173,374.667,173,384.333C173,394,173,401,173,404.5L173,408" id="mermaid-1780626020865-L_API_CFG_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_API_CFG_0" data-points="W3sieCI6MjAzLjczODI0NzI5NDE3NDk4LCJ5IjozMTN9LHsieCI6MTczLCJ5IjozNTB9LHsieCI6MTczLCJ5IjozODd9LHsieCI6MTczLCJ5Ijo0MTJ9XQ==" data-look="classic" marker-end="url(#mermaid-1780626020865_flowchart-v2-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel" transform="translate(236.1380214691162, 173)"><g class="label" data-id="L_UI_API_0" transform="translate(-65.71354675292969, -12)"><foreignObject width="131.42709350585938" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>HTTP REST / JSON</p></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(299.2760429382324, 350)"><g class="label" data-id="L_API_DB_0" transform="translate(-70.078125, -12)"><foreignObject width="140.15625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>SQLAlchemy 連線池</p></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(173, 350)"><g class="label" data-id="L_API_CFG_0" transform="translate(-36.19791793823242, -12)"><foreignObject width="72.39583587646484" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>讀取/寫入</p></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="mermaid-1780626020865-flowchart-UI-0" data-look="classic" transform="translate(236.1380214691162, 72)"><rect class="basic label-container" style="" x="-87.484375" y="-39" width="174.96875" height="78"></rect><g class="label" style="" transform="translate(-57.484375, -24)"><rect></rect><foreignObject width="114.96875" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Dashboard 前端<br>HTML / CSS / JS</p></span></div></foreignObject></g></g><g class="node default" id="mermaid-1780626020865-flowchart-API-1" data-look="classic" transform="translate(236.1380214691162, 274)"><rect class="basic label-container" style="" x="-74.63021087646484" y="-39" width="149.2604217529297" height="78"></rect><g class="label" style="" transform="translate(-44.630210876464844, -24)"><rect></rect><foreignObject width="89.26042175292969" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>FastAPI 後端<br>Python 3.11</p></span></div></foreignObject></g></g><g class="node default" id="mermaid-1780626020865-flowchart-CFG-2" data-look="classic" transform="translate(173, 463)"><rect class="basic label-container" style="" x="-130" y="-51" width="260" height="102"></rect><g class="label" style="" transform="translate(-100, -36)"><rect></rect><foreignObject width="200" height="72"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;"><span class="nodeLabel"><p>設定檔<br>config.yaml / thresholds.yaml</p></span></div></foreignObject></g></g><g class="node default" id="mermaid-1780626020865-flowchart-DB-3" data-look="classic" transform="translate(484.55729484558105, 463)"><path d="M0,8.185741623838235 a30.42708396911621,8.185741623838235 0,0,0 60.85416793823242,0 a30.42708396911621,8.185741623838235 0,0,0 -60.85416793823242,0 l0,47.18574162383823 a30.42708396911621,8.185741623838235 0,0,0 60.85416793823242,0 l0,-47.18574162383823" class="basic label-container outer-path" style="" transform="translate(-30.42708396911621, -31.778612435757353)"></path><g class="label" style="" transform="translate(-22.92708396911621, -2)"><rect></rect><foreignObject width="45.85416793823242" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>MySQL</p></span></div></foreignObject></g></g></g></g></g><defs><filter id="mermaid-1780626020865-drop-shadow" height="130%" width="130%"><feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"></feDropShadow></filter></defs><defs><filter id="mermaid-1780626020865-drop-shadow-small" height="150%" width="150%"><feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"></feDropShadow></filter></defs></svg></pre>
+<h3 id="h-4">部署架構</h3>
+<ul>
+<li>作業系統：Linux Rocky 9</li>
+<li>Python 版本：3.11+</li>
+<li>後端框架：FastAPI + Uvicorn（ASGI）</li>
+<li>前端：靜態檔案，由 Nginx 或 FastAPI StaticFiles 提供服務</li>
+<li>資料庫：MySQL 8.0+（外部既有資料庫，唯讀存取）</li>
+<li>程序管理：systemd service</li>
+</ul>
+<hr>
+<h2 id="h-5">專案目錄結構</h2>
+<pre class="hljs"><code>radar-monitoring-platform/
+├── backend/
+│   ├── main.py                  # FastAPI 應用程式進入點
+│   ├── config.py                # 設定檔載入模組
+│   ├── database.py              # SQLAlchemy 連線池管理
+│   ├── models.py                # Pydantic 資料模型
+│   ├── routers/
+│   │   ├── completeness.py      # GET /api/v1/completeness/current
+│   │   ├── instruments.py       # GET/PUT /api/v1/instruments/*
+│   │   └── system.py            # GET /api/v1/system/current, /api/v1/disk/current
+│   ├── services/
+│   │   ├── alert_service.py     # 儀器時間差查詢與閾值管理
+│   │   └── system_service.py    # 系統負載與磁碟狀態查詢
+│   └── requirements.txt
+├── frontend/
+│   ├── index.html               # 首頁（導覽）
+│   ├── instruments.html         # 儀器即時狀況
+│   ├── computers.html           # 電腦即時狀況
+│   ├── settings.html            # 儀器閾值設定
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       ├── api.js               # 後端 API 呼叫封裝
+│       ├── clock.js             # 共用時鐘
+│       ├── dashboard.js         # 儀器即時狀況控制器
+│       ├── computers.js         # 電腦即時狀況控制器
+│       └── settings.js          # 閾值設定控制器
+├── config/
+│   ├── config.yaml              # 資料庫連線參數與系統設定
+│   └── thresholds.yaml          # 各儀器閾值設定（持久化）
+├── logs/
+└── deploy/
+    └── radar-monitor.service    # systemd 服務設定檔
+</code></pre>
+<hr>
+<h2 id="h-6">元件與介面</h2>
+<h3 id="h-7">後端元件</h3>
+<p>Backend 是前端與資料庫之間的橋樑，負責查詢並以 REST API 回傳結果。</p>
+<ul>
+<li><strong>資料存取層</strong>：<code>database.py</code> 管理 SQLAlchemy 連線池，統一對三個 MySQL 資料庫（FileStatus、SystemStatus、DiskStatus）的唯讀存取。</li>
+<li><strong>業務邏輯層</strong>：<code>services/</code> 封裝查詢邏輯，與路由層解耦。</li>
+<li><strong>API 層</strong>：<code>routers/</code> 提供 <code>/api/v1</code> 前綴的 REST 端點，路由保持精簡。</li>
+<li><strong>設定層</strong>：<code>config.py</code> 從 <code>config.yaml</code> 載入 DB 連線參數；閾值從 <code>thresholds.yaml</code> 讀寫。</li>
+</ul>
+<h4>alert_service.py</h4>
+<p>查詢所有 FileCheck 資料表，計算各儀器的 <code>diff_time_minutes</code>，並與 <code>thresholds.yaml</code> 的閾值比較。</p>
+<pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_all_instrument_statuses</span>() -&gt; <span class="hljs-built_in">list</span>[InstrumentStatus]
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_instrument_thresholds</span>(<span class="hljs-params">file_type: <span class="hljs-built_in">str</span></span>) -&gt; <span class="hljs-built_in">tuple</span>[<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>]
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">set_instrument_thresholds</span>(<span class="hljs-params">file_type: <span class="hljs-built_in">str</span>, yellow: <span class="hljs-built_in">float</span>, orange: <span class="hljs-built_in">float</span>, red: <span class="hljs-built_in">float</span></span>) -&gt; <span class="hljs-literal">None</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">list_instruments</span>() -&gt; <span class="hljs-built_in">list</span>[<span class="hljs-built_in">dict</span>]
+</code></pre>
+<h4>system_service.py</h4>
+<p>查詢 SystemStatus 和 DiskStatus 資料庫，回傳各電腦的負載、記憶體與磁碟使用率。</p>
+<pre class="hljs"><code><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_system_status</span>() -&gt; <span class="hljs-built_in">list</span>[<span class="hljs-built_in">dict</span>]
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_disk_status</span>() -&gt; <span class="hljs-built_in">list</span>[<span class="hljs-built_in">dict</span>]
+</code></pre>
+<h3 id="h-8">前端元件</h3>
+<table>
+<thead>
+<tr>
+<th>頁面</th>
+<th>檔案</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>首頁</td>
+<td><code>index.html</code> + <code>clock.js</code></td>
+<td>導覽頁，三個入口</td>
+</tr>
+<tr>
+<td>儀器即時狀況</td>
+<td><code>instruments.html</code> + <code>dashboard.js</code></td>
+<td>依科別分組，異常儀器直接顯示，正常儀器折疊為綠色摘要方框，點擊展開；頁面頂部有科別篩選列</td>
+</tr>
+<tr>
+<td>儀器歷史資料</td>
+<td><code>history.html</code> + <code>history.js</code></td>
+<td>點擊儀器卡片後在新分頁開啟，顯示 DiffTime 時序圖（含閾值線）及同 IP 電腦的 CPU/記憶體/磁碟時序圖，支援 6h/1d/1w/1m/3m 時間範圍切換</td>
+</tr>
+<tr>
+<td>電腦即時狀況</td>
+<td><code>computers.html</code> + <code>computers.js</code></td>
+<td>依科別分組，負載/記憶體/磁碟</td>
+</tr>
+<tr>
+<td>儀器閾值設定</td>
+<td><code>settings.html</code> + <code>settings.js</code></td>
+<td>三段閾值設定，寫回 thresholds.yaml</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="h-9">API 設計</h2>
+<h3 id="h-10">基礎路徑：<code>/api/v1</code></h3>
+<h4>GET <code>/api/v1/completeness/current</code></h4>
+<p>取得所有儀器的即時狀態。</p>
+<p><strong>回應（200 OK）：</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">"instruments"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">"file_type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"RCMD_rb5_CS"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"equipment_name"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"radar"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"ip"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"192.168.1.10"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"department"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"wrs"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"latest_file_time"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"2026-04-02T10:00:00Z"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"diff_time_minutes"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5.2</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"threshold_yellow"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">10.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"threshold_orange"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">15.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"threshold_red"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">20.0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"is_alert"</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"calculated_at"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"2026-04-02T10:00:05Z"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"status"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"ok"</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><strong>回應（503）：</strong> DB 連線失敗。</p>
+<hr>
+<h4>GET <code>/api/v1/instruments</code></h4>
+<p>取得所有儀器清單與目前閾值。</p>
+<h4>PUT <code>/api/v1/instruments/{file_type}/threshold</code></h4>
+<p>更新特定儀器的三段閾值。</p>
+<p><strong>請求本體：</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">"threshold_yellow"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">10.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"threshold_orange"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">15.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"threshold_red"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">20.0</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<hr>
+<h4>GET <code>/api/v1/history/{file_type}</code></h4>
+<p>取得特定儀器在指定時間範圍內的 DiffTime 歷史記錄。</p>
+<p><strong>Query 參數：</strong></p>
+<ul>
+<li><code>ip</code>：儀器 IP（必填）</li>
+<li><code>range</code>：時間範圍，可選值 <code>6h</code>、<code>1d</code>、<code>1w</code>、<code>1m</code>、<code>3m</code>（預設 <code>1d</code>）</li>
+</ul>
+<p><strong>回應（200 OK）：</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">"file_type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"RCMD_rb5_CS"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"ip"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"192.168.1.10"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"range"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"1d"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"threshold_yellow"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">12.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"threshold_orange"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">17.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"threshold_red"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">27.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"data"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span> <span class="hljs-attr">"time"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"2026-04-14T10:00:00Z"</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">"diff_time_minutes"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8.5</span> <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h4>GET <code>/api/v1/history/system</code></h4>
+<p>取得特定 IP 電腦在指定時間範圍內的 CPU、記憶體、磁碟歷史記錄。</p>
+<p><strong>Query 參數：</strong></p>
+<ul>
+<li><code>ip</code>：電腦 IP（必填）</li>
+<li><code>range</code>：時間範圍，可選值同上</li>
+</ul>
+<p><strong>回應（200 OK）：</strong></p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">"ip"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"192.168.1.10"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"range"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"1d"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"cpu"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">{</span> <span class="hljs-attr">"time"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"2026-04-14T10:00:00Z"</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">"load_1"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">12.3</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"memory"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">{</span> <span class="hljs-attr">"time"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"2026-04-14T10:00:00Z"</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">"memory_use"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">55.2</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"disk"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">{</span> <span class="hljs-attr">"time"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"2026-04-14T10:00:00Z"</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">"used"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">42.1</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<hr>
+<p>取得各電腦的系統負載與記憶體使用率。</p>
+<h4>GET <code>/api/v1/disk/current</code></h4>
+<p>取得各電腦的磁碟使用率（%）。</p>
+<hr>
+<h2 id="h-11">資料模型</h2>
+<h3 id="h-12">現有資料庫結構（唯讀存取）</h3>
+<p><strong>FileStatus 資料庫</strong></p>
+<pre class="hljs"><code><span class="hljs-comment">-- 各儀器類型的即時快照（最新一筆）</span>
+radarFileCheck        (IP, FileName, FileType, FileTime <span class="hljs-type">float</span>, DiffTime <span class="hljs-type">float</span>)
+HFradarFileCheck      (IP, FileName, FileType, FileTime <span class="hljs-type">float</span>, DiffTime <span class="hljs-type">float</span>)
+satelliteFileCheck    (IP, FileName, FileType, FileTime <span class="hljs-type">float</span>, DiffTime <span class="hljs-type">float</span>)
+windprofilerFileCheck (IP, FileName, FileType, FileTime <span class="hljs-type">float</span>, DiffTime <span class="hljs-type">float</span>)
+DSFileCheck           (IP, FileName, FileType, FileTime <span class="hljs-type">float</span>, DiffTime <span class="hljs-type">float</span>)
+<span class="hljs-comment">-- DS 前綴代表東沙島資料，FileType 以 DS_ 開頭</span>
+
+<span class="hljs-comment">-- 各儀器類型的歷史記錄</span>
+radarStatus <span class="hljs-operator">/</span> HFradarStatus <span class="hljs-operator">/</span> satelliteStatus <span class="hljs-operator">/</span> windprofilerStatus <span class="hljs-operator">/</span> DSStatus
+<span class="hljs-comment">-- (ID, IP, FileName, FileType, FileTime float, DiffTime float)</span>
+
+<span class="hljs-comment">-- 檔案類型對應設備名稱</span>
+FileTypeList (ID, FileType, EquipmentName)
+</code></pre>
+<p><strong>SystemStatus 資料庫</strong></p>
+<pre class="hljs"><code>CheckList   (IP PK, ServerTime datetime, Load_1, Load_5, LOAD_15, MemoryUSE <span class="hljs-type">float</span>)
+SystemIPList (IP PK, EquipmentName, Department)
+</code></pre>
+<blockquote>
+<p><strong>Department 代碼對照表</strong></p>
+<table>
+<thead>
+<tr>
+<th>Department</th>
+<th>中文名稱</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sos</code></td>
+<td>衛星作業科</td>
+</tr>
+<tr>
+<td><code>dqcs</code></td>
+<td>品管科</td>
+</tr>
+<tr>
+<td><code>rsa</code></td>
+<td>應用科</td>
+</tr>
+<tr>
+<td><code>wrs</code></td>
+<td>氣象雷達科</td>
+</tr>
+<tr>
+<td><code>mrs</code></td>
+<td>海象雷達科</td>
+</tr>
+</tbody>
+</table>
+</blockquote>
+<p><strong>DiskStatus 資料庫</strong></p>
+<pre class="hljs"><code>CheckList (IP, ServerTime datetime, FileSystem, Used <span class="hljs-type">float</span>)
+<span class="hljs-comment">-- Used: 磁碟使用率（%）</span>
+</code></pre>
+<h3 id="h-13">閾值設定（thresholds.yaml）</h3>
+<p>操作人員只需設定每個儀器的資料週期 $T$（分鐘），系統自動計算三段門檻：</p>
+<ul>
+<li>黃色 = $T$ + 5 分鐘</li>
+<li>橙色 = $T$ + 10 分鐘</li>
+<li>紅色 = $T$ + 20 分鐘</li>
+</ul>
+<pre class="hljs"><code><span class="hljs-attr">defaults:</span>
+  <span class="hljs-attr">interval_minutes:</span> <span class="hljs-number">7</span>  <span class="hljs-comment"># 預設資料週期 T（分鐘）</span>
+
+<span class="hljs-attr">instruments:</span>
+  <span class="hljs-attr">RCMD_rb5_CS:</span>
+    <span class="hljs-attr">interval_minutes:</span> <span class="hljs-number">10</span>  <span class="hljs-comment"># 此儀器的資料週期 T</span>
+  <span class="hljs-attr">RCKT_rb5_CDD:</span>
+    <span class="hljs-attr">interval_minutes:</span> <span class="hljs-number">7</span>
+</code></pre>
+<p>啟動時從檔案載入，透過 API 修改後立即寫回，重啟後保留。</p>
+<h3 id="h-14">儀器狀態顏色規則</h3>
+<p>以資料週期 $T$ 為基準，系統自動計算三段門檻：</p>
+<table>
+<thead>
+<tr>
+<th>條件</th>
+<th>顏色</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>diff ≤ $T$ + 5 分鐘</td>
+<td>🟢 綠色</td>
+<td>正常（Normal）</td>
+</tr>
+<tr>
+<td>diff &gt; $T$ + 5 分鐘</td>
+<td>🟡 黃色</td>
+<td>延遲（Delayed）</td>
+</tr>
+<tr>
+<td>diff &gt; $T$ + 10 分鐘</td>
+<td>🟠 橙色</td>
+<td>嚴重延遲（Critical Delay）</td>
+</tr>
+<tr>
+<td>diff &gt; $T$ + 20 分鐘</td>
+<td>🔴 紅色</td>
+<td>遺失（Missing）</td>
+</tr>
+<tr>
+<td>diff &gt; 14400 分鐘或 NULL</td>
+<td>⬜ 灰色</td>
+<td>斷線</td>
+</tr>
+</tbody>
+</table>
+<p>各科別分組顯示邏輯：</p>
+<ul>
+<li><strong>正常儀器</strong>：不單獨顯示，以一個綠色摘要方框呈現「共 N 台，正常 M 台」，點擊後展開顯示各別正常儀器卡片。</li>
+<li><strong>異常儀器</strong>（黃/橙/紅/灰）：直接顯示在分組內，不需點擊展開。</li>
+</ul>
+<p>科別篩選列：</p>
+<ul>
+<li>儀器狀態頁面頂部顯示一排圓角篩選按鈕：<strong>全部 / 氣象雷達科 / 海象雷達科 / 衛星作業科 / 品管科 / 應用科</strong></li>
+<li>點擊科別按鈕後，僅顯示該科別的分組，其餘隱藏；點擊「全部」恢復顯示所有分組</li>
+<li>篩選為純前端操作，不重新打 API，直接從已快取資料重新渲染</li>
+<li>自動刷新後保持目前選取的篩選狀態</li>
+</ul>
+<h3 id="h-15">Pydantic 模型</h3>
+<pre class="hljs"><code><span class="hljs-keyword">class</span> <span class="hljs-title class_">InstrumentStatus</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    file_type: <span class="hljs-built_in">str</span>
+    equipment_name: <span class="hljs-built_in">str</span>
+    ip: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">str</span>]
+    department: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">str</span>]
+    latest_file_time: <span class="hljs-type">Optional</span>[datetime]
+    diff_time_minutes: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">float</span>]
+    interval_minutes: <span class="hljs-built_in">float</span>   <span class="hljs-comment"># 資料週期 T</span>
+    threshold_yellow: <span class="hljs-built_in">float</span>   <span class="hljs-comment"># T + 5（自動計算）</span>
+    threshold_orange: <span class="hljs-built_in">float</span>   <span class="hljs-comment"># T + 10（自動計算）</span>
+    threshold_red: <span class="hljs-built_in">float</span>      <span class="hljs-comment"># T + 20（自動計算）</span>
+    is_alert: <span class="hljs-built_in">bool</span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">InstrumentIntervalSetting</span>(<span class="hljs-title class_ inherited__">BaseModel</span>):
+    interval_minutes: <span class="hljs-built_in">float</span> = Field(gt=<span class="hljs-number">0.0</span>)  <span class="hljs-comment"># 資料週期 T，必須大於 0</span>
+</code></pre>
+<h4>電腦狀態三段燈號</h4>
+<table>
+<thead>
+<tr>
+<th>指標</th>
+<th>黃燈</th>
+<th>橙燈</th>
+<th>紅燈</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU 使用率</td>
+<td>連續 1 分鐘 &gt; 80%</td>
+<td>連續 5 分鐘 &gt; 80%</td>
+<td>連續 15 分鐘 &gt; 80%</td>
+</tr>
+<tr>
+<td>CPU 更新逾時</td>
+<td>&gt; 3 分鐘未更新</td>
+<td>&gt; 10 分鐘未更新</td>
+<td>&gt; 30 分鐘未更新</td>
+</tr>
+<tr>
+<td>記憶體負載</td>
+<td>&gt; 60%</td>
+<td>&gt; 70%</td>
+<td>&gt; 80%</td>
+</tr>
+<tr>
+<td>磁碟剩餘空間</td>
+<td>&lt; 10%</td>
+<td>&lt; 5%</td>
+<td>&lt; 1%</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>錯誤類型</th>
+<th>後端行為</th>
+<th>前端顯示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DB 連線失敗</td>
+<td>回傳 503</td>
+<td>顯示「資料庫連線失敗」</td>
+</tr>
+<tr>
+<td>查詢逾時（&gt;5秒）</td>
+<td>回傳 504，記錄日誌</td>
+<td>顯示「資料更新失敗，正在重試」</td>
+</tr>
+<tr>
+<td>網路錯誤</td>
+<td>N/A</td>
+<td>顯示「資料更新失敗，正在重試」</td>
+</tr>
+<tr>
+<td>閾值輸入負數</td>
+<td>回傳 422</td>
+<td>顯示驗證錯誤訊息</td>
+</tr>
+<tr>
+<td>儀器不存在</td>
+<td>回傳 404</td>
+<td>顯示「找不到指定儀器」</td>
+</tr>
+<tr>
+<td>3 次重連失敗</td>
+<td>記錄 ERROR 日誌</td>
+<td>顯示持續性連線失敗警示</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="h-16">測試策略</h2>
+<ul>
+<li>單元測試：<code>pytest</code> + <code>pytest-mock</code>，測試 DB 連線重試邏輯、閾值驗證</li>
+<li>整合測試：<code>pytest</code> + <code>httpx</code>，測試 API 端點正常回應與錯誤情境</li>
+<li>屬性測試：<code>hypothesis</code>，驗證閾值判斷邏輯的正確性</li>
+</ul>
+<hr>
+<h2 id="h-17">異常判定標準與告警機制</h2>
+<h3 id="h-18">檔案到位判定標準</h3>
+<p>以資料週期結束時間 $T$ 為基準：</p>
+<table>
+<thead>
+<tr>
+<th>狀態</th>
+<th>條件</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>正常（Normal）</td>
+<td>diff ≤ $T$ + 5 分鐘</td>
+<td>檔案於週期結束後 5 分鐘內抵達</td>
+</tr>
+<tr>
+<td>延遲（Delayed）</td>
+<td>$T$ + 5 &lt; diff ≤ $T$ + 10 分鐘</td>
+<td>檔案超過 5 分鐘未抵達</td>
+</tr>
+<tr>
+<td>嚴重延遲（Critical Delay）</td>
+<td>$T$ + 10 &lt; diff ≤ $T$ + 20 分鐘</td>
+<td>檔案超過 10 分鐘未抵達</td>
+</tr>
+<tr>
+<td>遺失（Missing）</td>
+<td>diff &gt; $T$ + 20 分鐘</td>
+<td>檔案超過 20 分鐘未抵達</td>
+</tr>
+</tbody>
+</table>
+<h3 id="h-19">硬體警戒門檻</h3>
+<table>
+<thead>
+<tr>
+<th>指標</th>
+<th>警告條件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU 使用率</td>
+<td>超過 80%</td>
+</tr>
+<tr>
+<td>記憶體負載</td>
+<td>超過 60%</td>
+</tr>
+<tr>
+<td>磁碟空間</td>
+<td>剩餘空間低於 10%</td>
+</tr>
+<tr>
+<td>CPU 更新逾時</td>
+<td>超過 3 分鐘未更新（表示電腦關機或網路不通）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="h-20">異常分級與燈號</h3>
+<p>依影響程度分為三個等級：</p>
+<h4>🟡 黃燈（Warning）</h4>
+<ul>
+<li>檔案延遲（Delayed）</li>
+<li>CPU 使用率連續 <strong>1 分鐘</strong>超過 80%</li>
+<li>記憶體負載超過 60%</li>
+<li>磁碟剩餘空間低於 10%</li>
+<li>CPU 使用率超過 <strong>3 分鐘</strong>未更新</li>
+</ul>
+<h4>🟠 橙燈（Critical）</h4>
+<ul>
+<li>檔案嚴重延遲（Critical Delay）</li>
+<li>CPU 使用率連續 <strong>5 分鐘</strong>超過 80%</li>
+<li>記憶體負載超過 70%</li>
+<li>磁碟剩餘空間低於 5%</li>
+<li>CPU 使用率超過 <strong>10 分鐘</strong>未更新</li>
+</ul>
+<h4>🔴 紅燈（Emergency）</h4>
+<ul>
+<li>檔案遺失（Missing）</li>
+<li>CPU 使用率連續 <strong>15 分鐘</strong>超過 80%</li>
+<li>記憶體負載超過 80%</li>
+<li>磁碟剩餘空間低於 1%</li>
+<li>CPU 使用率超過 <strong>30 分鐘</strong>未更新</li>
+</ul>
+<h4>電腦狀態三段燈號</h4>
+<table>
+<thead>
+<tr>
+<th>指標</th>
+<th>黃燈</th>
+<th>橙燈</th>
+<th>紅燈</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU 使用率</td>
+<td>連續 1 分鐘 &gt; 80%</td>
+<td>連續 5 分鐘 &gt; 80%</td>
+<td>連續 15 分鐘 &gt; 80%</td>
+</tr>
+<tr>
+<td>CPU 更新逾時</td>
+<td>&gt; 3 分鐘未更新</td>
+<td>&gt; 10 分鐘未更新</td>
+<td>&gt; 30 分鐘未更新</td>
+</tr>
+<tr>
+<td>記憶體負載</td>
+<td>&gt; 60%</td>
+<td>&gt; 70%</td>
+<td>&gt; 80%</td>
+</tr>
+<tr>
+<td>磁碟剩餘空間</td>
+<td>&lt; 10%</td>
+<td>&lt; 5%</td>
+<td>&lt; 1%</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+</body>
+</html>
