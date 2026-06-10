@@ -220,7 +220,7 @@
 5. THE 時序圖 SHALL 在 Y 軸疊加顯示黃色、橙色、紅色三條閾值水平線，對應該儀器目前的 threshold_yellow、threshold_orange、threshold_red 設定值。
 6. THE 歷史資料頁面 SHALL 在同一頁面另外顯示與該儀器同一 IP 電腦的 CPU 負載（Load_1）、記憶體使用率（MemoryUSE）、磁碟使用率（Used）三張時序折線圖，時間範圍與儀器圖表同步。
 7. THE Platform SHALL 從 `radarStatus`、`HFradarStatus`、`satelliteStatus`、`windprofilerStatus`、`DSStatus` 等歷史資料表取得儀器 DiffTime 歷史記錄。
-8. THE Platform SHALL 從 `SystemStatus.CheckList` 取得 CPU 與記憶體歷史記錄，從 `DiskStatus.CheckList` 取得磁碟使用率歷史記錄。
+8. THE Platform SHALL 從 `SystemStatus.Status` 取得 CPU 與記憶體歷史記錄，從 `DiskStatus.CheckList` 取得磁碟使用率歷史記錄。
 9. IF 指定時間範圍內無歷史資料，THE 歷史資料頁面 SHALL 顯示「此時間範圍內無資料」提示。
 
 ---
@@ -237,5 +237,5 @@
 4. THE 歷史資料頁面 SHALL 顯示該電腦的 CPU 負載（Load_1）、記憶體使用率（MemoryUSE）、磁碟使用率（Used）三張時序折線圖。
 5. THE 時序圖 SHALL 在 Y 軸疊加顯示黃色、橙色、紅色三條閾值水平線，對應各指標的硬體警戒門檻。
 6. THE 歷史資料頁面 SHALL 以卡片形式列出該電腦（同 IP）所有相關儀器的即時狀態，顯示方式與儀器即時狀況頁面的卡片相同。
-7. THE Platform SHALL 從 `SystemStatus.CheckList` 取得 CPU 與記憶體歷史記錄，從 `DiskStatus.CheckList` 取得磁碟使用率歷史記錄。
+7. THE Platform SHALL 從 `SystemStatus.Status` 取得 CPU 與記憶體歷史記錄，從 `DiskStatus.CheckList` 取得磁碟使用率歷史記錄。
 8. IF 指定時間範圍內無歷史資料，THE 歷史資料頁面 SHALL 顯示「此時間範圍內無資料」提示。

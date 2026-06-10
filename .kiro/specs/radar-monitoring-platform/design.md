@@ -392,7 +392,13 @@ FileTypeList (ID, FileType, EquipmentName)
 
 **SystemStatus 資料庫**
 ```sql
+-- 即時快照：每 IP 一筆，每次採樣覆寫（current-status 端點使用）
 CheckList   (IP PK, ServerTime datetime, Load_1, Load_5, LOAD_15, MemoryUSE float)
+
+-- 歷史累加表：每次採樣 insert 一筆（CPU/記憶體 history 端點使用）
+-- 欄位同 CheckList：IP, ServerTime datetime, Load_1, Load_5, LOAD_15, MemoryUSE float
+Status      (IP, ServerTime datetime, Load_1, Load_5, LOAD_15, MemoryUSE float)
+
 SystemIPList (IP PK, EquipmentName, Department)
 ```
 

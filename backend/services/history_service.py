@@ -100,9 +100,12 @@ def get_system_history(ip: str, range: str) -> dict:
     start_dt = _parse_range(range)
     timeout = get_config().system.query_timeout_seconds
 
+    # SystemStatus.Status 為歷史累加表（每次採樣 insert 一筆），
+    # 與 CheckList（每 IP 僅保留最新一筆的即時快照表）不同，
+    # 因此 CPU / 記憶體時序圖須從 Status 取得完整歷史。
     _SYS_SQL = text("""
         SELECT ServerTime, Load_1, MemoryUSE
-        FROM CheckList
+        FROM Status
         WHERE IP = :ip
           AND ServerTime >= :start_dt
         ORDER BY ServerTime ASC
