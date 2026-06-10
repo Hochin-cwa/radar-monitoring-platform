@@ -112,8 +112,8 @@ def get_system_history(ip: str, range: str) -> dict:
     """)
 
     _DISK_SQL = text("""
-        SELECT ServerTime, Used
-        FROM CheckList
+        SELECT ServerTime, FileSystem, Used
+        FROM Status
         WHERE IP = :ip
           AND ServerTime >= :start_dt
         ORDER BY ServerTime ASC
@@ -166,6 +166,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 t_iso = str(t)
             disk_data.append({
                 "time": t_iso,
+                "file_system": row.FileSystem,
                 "used": float(row.Used) if row.Used is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:

@@ -122,30 +122,49 @@
       </div>
     </div>
 
-    <!-- 系統狀態圖 -->
-    <div class="system-charts-grid">
-      <div class="system-chart-card">
-        <h3>CPU 負載（1m / 5m / 15m）</h3>
-        <div class="system-chart-wrapper">
-          <canvas id="cpu-chart"></canvas>
-          <div id="cpu-no-data" class="no-data hidden">此時間範圍內無資料</div>
+    <!-- 系統負載與記憶體 -->
+    <div class="section" id="sysmem-section">
+      <h2>系統負載與記憶體</h2>
+      <div class="system-charts-grid">
+        <div class="system-chart-card">
+          <h3>CPU 負載 1m（Load_1）</h3>
+          <div class="system-chart-wrapper">
+            <canvas id="cpu1-chart"></canvas>
+            <div id="cpu1-no-data" class="no-data hidden">此時間範圍內無資料</div>
+          </div>
+        </div>
+
+        <div class="system-chart-card">
+          <h3>CPU 負載 5m（Load_5）</h3>
+          <div class="system-chart-wrapper">
+            <canvas id="cpu5-chart"></canvas>
+            <div id="cpu5-no-data" class="no-data hidden">此時間範圍內無資料</div>
+          </div>
+        </div>
+
+        <div class="system-chart-card">
+          <h3>CPU 負載 15m（Load_15）</h3>
+          <div class="system-chart-wrapper">
+            <canvas id="cpu15-chart"></canvas>
+            <div id="cpu15-no-data" class="no-data hidden">此時間範圍內無資料</div>
+          </div>
+        </div>
+
+        <div class="system-chart-card">
+          <h3>記憶體使用率（MemoryUSE %）</h3>
+          <div class="system-chart-wrapper">
+            <canvas id="memory-chart"></canvas>
+            <div id="memory-no-data" class="no-data hidden">此時間範圍內無資料</div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="system-chart-card">
-        <h3>記憶體使用率（MemoryUSE %）</h3>
-        <div class="system-chart-wrapper">
-          <canvas id="memory-chart"></canvas>
-          <div id="memory-no-data" class="no-data hidden">此時間範圍內無資料</div>
-        </div>
-      </div>
-
-      <div class="system-chart-card">
-        <h3>磁碟使用率（Used %）</h3>
-        <div class="system-chart-wrapper">
-          <canvas id="disk-chart"></canvas>
-          <div id="disk-no-data" class="no-data hidden">此時間範圍內無資料</div>
-        </div>
+    <!-- 磁碟使用率（每個磁碟一張卡片，動態產生） -->
+    <div class="section" id="disk-section">
+      <h2>磁碟使用率</h2>
+      <div id="disk-charts-grid" class="system-charts-grid">
+        <p class="loading" id="disk-loading">載入中…</p>
       </div>
     </div>
 

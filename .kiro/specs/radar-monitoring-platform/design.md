@@ -138,7 +138,7 @@ def get_system_history(ip: str, range: str) -> dict
 |------|------|------|
 | 首頁 | `index.html` + `clock.js` | 導覽頁，各功能入口 |
 | 儀器即時狀況 | `instruments.html` + `dashboard.js` | 依科別分組，異常儀器直接顯示，正常儀器折疊為綠色摘要方框；頂部有科別篩選列 |
-| 儀器歷史資料 | `history.html` + `history.js` | 點擊儀器卡片後在新分頁開啟，顯示 DiffTime 時序圖（含閾值線）及同 IP 電腦指標時序圖 |
+| 儀器歷史資料 | `history.html` + `history.js` | 點擊儀器卡片後在新分頁開啟，顯示 DiffTime 時序圖（含閾值線），以及系統指標：「系統負載與記憶體」區塊（CPU Load_1/Load_5/Load_15 三張卡片 + 記憶體卡片）與「磁碟使用率」區塊（每個 file_system 一張卡片） |
 | 電腦即時狀況 | `computers.html` + `computers.js` | 依科別分組，三段燈號顯示 CPU/記憶體/磁碟警示 |
 | 儀器閾值設定 | `settings.html` + `settings.js` | 設定資料週期 T 或直接設定三段閾值 |
 
@@ -352,7 +352,7 @@ radar-monitoring-platform/
   "range": "1d",
   "cpu": [{ "time": "2026-04-14T10:00:00Z", "load_1": 12.3 }],
   "memory": [{ "time": "2026-04-14T10:00:00Z", "memory_use": 55.2 }],
-  "disk": [{ "time": "2026-04-14T10:00:00Z", "used": 42.1 }]
+  "disk": [{ "time": "2026-04-14T10:00:00Z", "file_system": "/dev/sda1", "used": 42.1 }]
 }
 ```
 
@@ -414,7 +414,11 @@ SystemIPList (IP PK, EquipmentName, Department)
 
 **DiskStatus 資料庫**
 ```sql
+-- 即時快照：每 IP×掛載點一筆，每次採樣覆寫（current-status 端點使用）
 CheckList (IP, ServerTime datetime, FileSystem, Used float)
+
+-- 歷史累加表：每次採樣 insert 一筆（磁碟 history 端點使用）
+Status    (IP, ServerTime datetime, FileSystem, Used float)
 -- Used: 磁碟使用率（%）
 ```
 

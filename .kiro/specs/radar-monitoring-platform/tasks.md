@@ -100,8 +100,8 @@
     - _Requirements: 7.2, 7.3, 7.7_
 
   - [x] 5.2 實作電腦系統歷史資料查詢
-    - `get_system_history(ip, range)`：查詢 SystemStatus.Status（CPU 負載 Load_1/Load_5/Load_15 與記憶體 MemoryUSE）與 DiskStatus.CheckList（磁碟 Used）
-    - 回傳 cpu（含 load_1/load_5/load_15）、memory、disk 三組時序資料
+    - `get_system_history(ip, range)`：查詢 SystemStatus.Status（CPU 負載 Load_1/Load_5/Load_15 與記憶體 MemoryUSE）與 DiskStatus.Status（磁碟 FileSystem、Used）
+    - 回傳 cpu（含 load_1/load_5/load_15）、memory、disk（每筆含 file_system、used）三組時序資料
     - _Requirements: 7.6, 7.8, 8.4, 8.7_
 
   - [ ]* 5.3 撰寫歷史資料表對應屬性測試
@@ -230,7 +230,7 @@
     - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.9_
 
   - [x] 14.2 實作同 IP 電腦指標時序圖
-    - 在歷史頁面另繪 CPU（Load_1）、記憶體（MemoryUSE）、磁碟（Used）三張時序圖
+    - 在歷史頁面繪製「系統負載與記憶體」區塊（CPU 負載 Load_1、Load_5、Load_15 三張卡片 + 記憶體 MemoryUSE 一張卡片）與「磁碟使用率」區塊（每個磁碟 file_system 各一張 Used 時序圖卡片）
     - 時間範圍與儀器主圖同步
     - `api.js` 新增 `fetchInstrumentHistory()` 與 `fetchSystemHistory()`
     - _Requirements: 7.6, 7.8_
@@ -242,7 +242,7 @@
 
   - [x] 14.4 實作電腦卡片點擊開啟歷史頁面
     - 電腦統一卡片點擊後在新分頁開啟該電腦歷史頁面
-    - 顯示 CPU、記憶體、磁碟時序圖，Y 軸疊加硬體警戒閾值線
+    - 顯示「系統負載與記憶體」區塊（CPU Load_1/Load_5/Load_15 + 記憶體）與「磁碟使用率」區塊（每個磁碟一張卡片）時序圖，記憶體與磁碟圖 Y 軸疊加硬體警戒閾值線
     - 以卡片列出該 IP 所有相關儀器即時狀態
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.8_
 

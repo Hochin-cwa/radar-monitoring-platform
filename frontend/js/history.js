@@ -4,11 +4,11 @@
  * 支援兩種模式（依 URL query string 判斷）：
  *   1. 儀器模式（預設，有 file_type）：
  *      - 繪製 DiffTime 時序折線圖（含三條閾值水平線）
- *      - 繪製同 IP 電腦的 CPU / 記憶體 / 磁碟三張時序圖
+ *      - 「系統負載與記憶體」區塊：CPU Load_1/5/15 三張卡片 + 記憶體一張卡片
+ *      - 「磁碟使用率」區塊：每個磁碟（file_system）一張時序圖卡片
  *   2. 電腦模式（mode=computer，或無 file_type 但有 ip）：
  *      - 隱藏 DiffTime 圖
- *      - 繪製 CPU（Load_1）/ 記憶體（MemoryUSE）/ 磁碟（Used）三張時序圖，
- *        記憶體與磁碟圖 Y 軸疊加硬體警戒閾值線
+ *      - 同上兩區塊，記憶體與磁碟圖 Y 軸疊加硬體警戒閾值線
  *      - 以卡片列出該 IP 所有相關儀器即時狀態
  *
  * 支援 6h / 1d / 1w / 1m / 3m 時間範圍切換。
@@ -40,13 +40,6 @@
 
   const DISCONNECT_THRESHOLD_MIN = 14400;
 
-  // ── CPU 三段負載線設定（一張圖三條線：1m / 5m / 15m） ─────
-  const CPU_SERIES = [
-    { key: 'load_1',  label: 'Load 1m',  color: 'rgb(74,222,128)' },
-    { key: 'load_5',  label: 'Load 5m',  color: 'rgb(56,189,248)' },
-    { key: 'load_15', label: 'Load 15m', color: 'rgb(167,139,250)' },
-  ];
-
   // ── 頁面標題與表頭 ────────────────────────────────────────
   if (COMPUTER_MODE) {
     const name = EQUIPMENT_NAME || IP;
@@ -76,9 +69,11 @@
 
   // ── Chart 實例 ────────────────────────────────────────────
   let _diffChart = null;
-  const _cpuRef = {};
+  const _cpu1Ref = {};
+  const _cpu5Ref = {};
+  const _cpu15Ref = {};
   const _memRef = {};
-  const _diskRef = {};
+  const _diskCharts = {};  // key: file_system → Chart 實例
 
   // ── 共用 Chart.js 時間軸選項 ──────────────────────────────
   function timeScaleOptions() {
@@ -190,50 +185,6 @@
     }
   }
 
-  // ── 建立或更新多線系統圖（一張圖多條時序線，例如 CPU 三段負載） ──
-  function renderMultiSeriesChart(chartRef, canvasId, noDataId, data, series, yLabel) {
-    const noDataEl = document.getElementById(noDataId);
-    const canvas = document.getElementById(canvasId);
-
-    // 任一系列有資料即視為有資料
-    const hasData = Array.isArray(data) && data.length > 0;
-    if (!hasData) {
-      noDataEl.classList.remove('hidden');
-      canvas.style.display = 'none';
-      if (chartRef.instance) { chartRef.instance.destroy(); chartRef.instance = null; }
-      return;
-    }
-
-    noDataEl.classList.add('hidden');
-    canvas.style.display = '';
-
-    const datasets = series.map((s, idx) => ({
-      label: s.label,
-      data: data.map(d => ({ x: d.time, y: d[s.key] })),
-      borderColor: s.color,
-      backgroundColor: 'transparent',
-      borderWidth: 1.5,
-      pointRadius: 0,
-      fill: false,
-      tension: 0.2,
-      order: idx,
-    }));
-
-    const options = baseChartOptions(yLabel);
-    options.plugins.legend = {
-      display: true,
-      labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 16 },
-    };
-
-    if (chartRef.instance && chartRef.instance.data.datasets.length === datasets.length) {
-      chartRef.instance.data.datasets = datasets;
-      chartRef.instance.update('none');
-    } else {
-      if (chartRef.instance) { chartRef.instance.destroy(); }
-      chartRef.instance = new Chart(canvas, { type: 'line', data: { datasets }, options });
-    }
-  }
-
   // ── 建立或更新系統圖（通用，可選疊加閾值線） ──────────────
   function renderSystemChart(chartRef, canvasId, noDataId, data, valueKey, yLabel, color, thresholds) {
     const noDataEl = document.getElementById(noDataId);
@@ -286,6 +237,57 @@
       if (chartRef.instance) { chartRef.instance.destroy(); }
       chartRef.instance = new Chart(canvas, { type: 'line', data: { datasets }, options });
     }
+  }
+
+  // ── CPU 三張卡片（Load_1 / Load_5 / Load_15，各一張單線圖） ──
+  function renderCpuCards(cpuData) {
+    renderSystemChart(_cpu1Ref, 'cpu1-chart', 'cpu1-no-data', cpuData, 'load_1', 'Load 1m', 'rgb(74,222,128)');
+    renderSystemChart(_cpu5Ref, 'cpu5-chart', 'cpu5-no-data', cpuData, 'load_5', 'Load 5m', 'rgb(56,189,248)');
+    renderSystemChart(_cpu15Ref, 'cpu15-chart', 'cpu15-no-data', cpuData, 'load_15', 'Load 15m', 'rgb(167,139,250)');
+  }
+
+  // ── 磁碟卡片（依 file_system 分組，每個磁碟一張時序圖卡片） ──
+  function renderDiskCards(diskData, thresholds) {
+    const grid = document.getElementById('disk-charts-grid');
+    if (!grid) return;
+
+    // 先銷毀既有圖表實例，再重建卡片
+    for (const fs of Object.keys(_diskCharts)) {
+      if (_diskCharts[fs]) _diskCharts[fs].destroy();
+      delete _diskCharts[fs];
+    }
+
+    // 依 file_system 分組
+    const groups = {};
+    for (const d of (diskData || [])) {
+      const fs = d.file_system || '(unknown)';
+      (groups[fs] = groups[fs] || []).push({ time: d.time, used: d.used });
+    }
+    const fsList = Object.keys(groups).sort();
+
+    grid.innerHTML = '';
+    if (fsList.length === 0) {
+      grid.innerHTML = '<p class="loading">此時間範圍內無磁碟資料</p>';
+      return;
+    }
+
+    fsList.forEach((fs, idx) => {
+      const cid = `disk-chart-${idx}`;
+      const nid = `disk-no-data-${idx}`;
+      const card = document.createElement('div');
+      card.className = 'system-chart-card';
+      card.innerHTML =
+        `<h3>磁碟 ${fs}（Used %）</h3>` +
+        `<div class="system-chart-wrapper">` +
+        `<canvas id="${cid}"></canvas>` +
+        `<div id="${nid}" class="no-data hidden">此時間範圍內無資料</div>` +
+        `</div>`;
+      grid.appendChild(card);
+
+      const ref = {};
+      renderSystemChart(ref, cid, nid, groups[fs], 'used', `${fs} Used %`, 'rgb(251,146,60)', thresholds);
+      _diskCharts[fs] = ref.instance;
+    });
   }
 
   // ── 狀態列 ────────────────────────────────────────────────
@@ -389,9 +391,9 @@
     try {
       if (COMPUTER_MODE) {
         const sysData = await fetchSystemHistory(IP, range);
-        renderMultiSeriesChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, CPU_SERIES, 'Load');
+        renderCpuCards(sysData.cpu);
         renderSystemChart(_memRef, 'memory-chart', 'memory-no-data', sysData.memory, 'memory_use', 'MemoryUSE %', 'rgb(251,191,36)', MEM_THRESHOLDS);
-        renderSystemChart(_diskRef, 'disk-chart', 'disk-no-data', sysData.disk, 'used', 'Used %', 'rgb(251,146,60)', DISK_THRESHOLDS);
+        renderDiskCards(sysData.disk, DISK_THRESHOLDS);
       } else {
         const [instrData, sysData] = await Promise.all([
           fetchInstrumentHistory(FILE_TYPE, IP, range),
@@ -405,9 +407,9 @@
           instrData.threshold_red,
         );
 
-        renderMultiSeriesChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, CPU_SERIES, 'Load');
+        renderCpuCards(sysData.cpu);
         renderSystemChart(_memRef, 'memory-chart', 'memory-no-data', sysData.memory, 'memory_use', 'MemoryUSE %', 'rgb(251,191,36)');
-        renderSystemChart(_diskRef, 'disk-chart', 'disk-no-data', sysData.disk, 'used', 'Used %', 'rgb(251,146,60)');
+        renderDiskCards(sysData.disk);
       }
     } catch (err) {
       const msg = err.type === 'timeout'
