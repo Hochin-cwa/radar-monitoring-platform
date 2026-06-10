@@ -1,12 +1,12 @@
-# 需求文件
+# Requirements Document
 
-## 簡介
+## Introduction
 
 雷達監控整合平台是一套網頁應用系統，部署於 Linux（Rocky 9）環境，以 MySQL 作為資料來源，提供操作人員即時監控各儀器資料時間差與電腦系統狀態的能力。系統透過 Dashboard 集中呈現關鍵指標，並以自動刷新機制確保資訊即時性。資料異常的主動推播通知由外部系統負責，本平台僅負責視覺化呈現。
 
 ---
 
-## 詞彙表
+## Glossary
 
 - **平台（Platform）**：本雷達監控整合平台網頁應用系統的總稱。
 - **Dashboard**：平台的主要監控畫面，集中顯示所有即時指標。
@@ -16,16 +16,20 @@
 - **本地時間（Local_Time）**：伺服器或瀏覽器所在時區的當前時間。
 - **UTC 時間（UTC_Time）**：協調世界時（Coordinated Universal Time）的當前時間。
 - **$T$**：資料週期結束時間，用於計算檔案到位時間差，通常指的是兩筆資料的時間間隔。
+- **統一卡片（Unified_Card）**：每台電腦對應的單一卡片，包含系統負載、記憶體與磁碟所有指標。
+- **電腦狀態 API（Computer_Status_API）**：後端合併端點 `GET /api/v1/computers/current`，回傳每台電腦的系統與磁碟合併資料。
+- **磁碟項目（Disk_Entry）**：單一磁碟掛載點的資料，包含 `file_system`（如 `/`、`/data`）與 `used_pct`。
+- **警示等級（Alert_Level）**：燈號等級，依嚴重程度排序為 `ok` < `yellow` < `orange` < `red`。
+- **CPU 逾時（CPU_Timeout）**：距上次系統資料更新的時間差（分鐘）。
+- **科別（Department）**：電腦或儀器所屬科別，取值為 `wrs`（氣象雷達科）、`mrs`（海象雷達科）、`sos`（衛星作業科）、`dqcs`（品管科）、`rsa`（應用科）。
 
----
+## Requirements
 
-## 需求
+### Requirement 1: 即時時間顯示
 
-### 需求 1：即時時間顯示
+**User Story:** 身為操作人員，我希望在 Dashboard 上同時看到本地時間與 UTC 時間，以便在跨時區協作時能快速對齊時間基準。
 
-**使用者故事：** 身為操作人員，我希望在 Dashboard 上同時看到本地時間與 UTC 時間，以便在跨時區協作時能快速對齊時間基準。
-
-#### 驗收標準
+#### Acceptance Criteria
 
 1. THE Dashboard SHALL 在頁面頂部同時顯示 Local_Time 與 UTC_Time。
 2. WHEN 頁面載入完成，THE Dashboard SHALL 立即顯示當前的 Local_Time 與 UTC_Time。
@@ -34,9 +38,9 @@
 
 ---
 
-### 需求 2：儀器資料時間差視覺顯示
+### Requirement 2: 儀器資料時間差視覺顯示
 
-**使用者故事：** 身為操作人員，我希望在 Dashboard 上看到每個儀器的最新資料時間差，並以顏色區分嚴重程度，以便快速判斷哪些儀器需要關注。
+**User Story:** 身為操作人員，我希望在 Dashboard 上看到每個儀器的最新資料時間差，並以顏色區分嚴重程度，以便快速判斷哪些儀器需要關注。
 
 > **注意：** 主動推播通知（email、SMS、webhook 等）由另一個專案負責，本平台僅負責視覺化呈現。
 
@@ -52,7 +56,7 @@
 | 遺失（Missing） | diff > $T$ + 20 分鐘 | 🔴 紅色 |
 | 斷線 | diff > 14400 分鐘或無資料 | ⬜ 灰色 |
 
-#### 驗收標準
+#### Acceptance Criteria
 
 1. WHEN 某 Instrument 的 DiffTime 在 $T$ + 5 分鐘以內，THE Dashboard SHALL 以綠色顯示。
 2. WHEN 某 Instrument 的 DiffTime 超過 $T$ + 5 分鐘（延遲），THE Dashboard SHALL 以黃色顯示。
@@ -61,32 +65,33 @@
 5. WHEN 某 Instrument 的 DiffTime 超過 14400 分鐘或無資料，THE Dashboard SHALL 以灰色顯示「斷線」。
 6. THE Dashboard SHALL 為每個 Instrument 各自顯示獨立的狀態區塊，包含 IP、FileType、EquipmentName 與時間差數值。
 7. THE Platform SHALL 從各 FileCheck 資料表取得每個 Instrument 的最新一筆快照，以判斷即時狀態。
-8. THE Dashboard SHALL 依科別（Department）分組顯示儀器狀態，所有正常的就不單獨顯示出來，用一個綠色方框顯示總共有多少個機器，正常的有多少，滑鼠點一下才會展開來各別顯示。
+8. THE Dashboard SHALL 依科別（Department）分組顯示儀器狀態，所有正常的儀器不單獨顯示，以一個綠色摘要方框呈現「共 N 台，正常 M 台」，點擊後展開顯示各別正常儀器卡片。
 9. THE Dashboard SHALL 在儀器狀態頁面頂部提供科別篩選列，包含「全部」及各科別按鈕（氣象雷達科、海象雷達科、衛星作業科、品管科、應用科），WHEN 操作人員點擊某科別按鈕，THE Dashboard SHALL 僅顯示該科別的儀器分組，其餘科別隱藏。
 10. WHEN 操作人員點擊「全部」按鈕，THE Dashboard SHALL 顯示所有科別的儀器分組。
 11. WHEN 資料自動刷新後，THE Dashboard SHALL 保持目前選取的科別篩選狀態不變。
 
 ---
 
-### 需求 3：自動刷新機制
+### Requirement 3: 自動刷新機制
 
-**使用者故事：** 身為操作人員，我希望 Dashboard 能自動定期刷新資料，以便在不手動操作的情況下持續掌握最新狀態。
+**User Story:** 身為操作人員，我希望 Dashboard 能自動定期刷新資料，以便在不手動操作的情況下持續掌握最新狀態。
 
-#### 驗收標準
+#### Acceptance Criteria
 
 1. THE Dashboard SHALL 以 Refresh_Interval（60 秒）為週期，自動向後端重新取得最新資料並更新所有顯示元件。
 2. WHEN 自動刷新觸發，THE Dashboard SHALL 在不重新載入整個頁面的情況下更新儀器狀態與電腦系統狀態。
 3. THE Dashboard SHALL 顯示上一次成功刷新的時間戳記。
 4. IF 自動刷新期間發生網路錯誤，THEN THE Platform SHALL 在 Dashboard 上顯示「資料更新失敗，正在重試」的提示，並於下一個 Refresh_Interval 重新嘗試。
 5. THE Dashboard SHALL 提供手動刷新按鈕，WHEN 操作人員點擊手動刷新按鈕，THE Dashboard SHALL 立即執行一次資料更新並重置自動刷新計時器。
+6. WHILE 網路錯誤狀態存在，THE Dashboard SHALL 保持手動刷新按鈕為可點擊狀態，允許操作人員隨時手動重試。
 
 ---
 
-### 需求 4：資料庫資料存取
+### Requirement 4: 資料庫資料存取
 
-**使用者故事：** 身為系統，我希望能穩定地從 MySQL 資料庫取得資料，以便提供給 Dashboard 顯示。
+**User Story:** 身為系統，我希望能穩定地從 MySQL 資料庫取得資料，以便提供給 Dashboard 顯示。
 
-#### 驗收標準
+#### Acceptance Criteria
 
 1. THE Platform SHALL 透過設定檔管理 Database 的連線參數（主機、埠號、資料庫名稱、帳號、密碼），不得將連線參數硬編碼於程式碼中。
 2. THE Platform SHALL 維護 Database 連線池，以支援 Dashboard 的並發查詢需求。
@@ -97,13 +102,15 @@
 
 ---
 
-### 需求 5：儀器時間差閾值管理
+### Requirement 5: 儀器時間差閾值管理
 
-**使用者故事：** 身為操作人員，我希望只需設定每個儀器的資料週期 $T$，系統自動計算三段警示門檻，以便根據各儀器的資料特性調整警示靈敏度。
+**User Story:** 身為操作人員，我希望只需設定每個儀器的資料週期 $T$，系統自動計算三段警示門檻；或在需要時直接指定三段閾值，以便根據各儀器的資料特性靈活調整警示靈敏度。
 
 #### 閾值計算規則
 
-操作人員只需設定每個儀器的資料週期 $T$（分鐘），系統自動計算：
+操作人員可透過兩種方式設定閾值：
+
+**方式一：設定資料週期 $T$（自動計算模式）**
 
 | 閾值 | 計算方式 | 對應狀態 |
 |------|---------|---------|
@@ -113,44 +120,98 @@
 
 預設 $T$ = 7 分鐘，預設門檻為黃色 12 分鐘、橙色 17 分鐘、紅色 27 分鐘。
 
-#### 驗收標準
+**方式二：直接設定三段閾值（直接設定模式）**
+
+操作人員直接指定 threshold_yellow、threshold_orange、threshold_red 三個值（皆須大於 0）。
+
+#### Acceptance Criteria
 
 1. THE Platform SHALL 從 FileTypeList 資料表取得所有 Instrument 清單，作為閾值設定的儀器來源。
-2. THE Dashboard SHALL 提供設定介面，讓操作人員查看所有 Instrument 及其目前的 $T$ 值（單位：分鐘）。
-3. WHEN 操作人員修改 $T$ 值，THE Platform SHALL 儲存該設定至 thresholds.yaml 並立即套用至後續的狀態判斷。
-4. THE Platform SHALL 允許操作人員為每個 Instrument 個別設定 $T$ 值，不同 Instrument 的設定互相獨立。
-5. IF 操作人員輸入的 $T$ 值為負數或零，THEN THE Platform SHALL 拒絕該輸入並顯示驗證錯誤訊息。
+2. THE Dashboard SHALL 提供設定介面，讓操作人員查看所有 Instrument 及其目前的閾值設定。
+3. WHEN 操作人員修改 $T$ 值（自動計算模式），THE Platform SHALL 以 $T$ 為基礎計算三段閾值（yellow = T+5, orange = T+10, red = T+20），儲存至 thresholds.yaml 並立即套用至後續的狀態判斷。
+4. WHEN 操作人員直接設定三段閾值（threshold_yellow、threshold_orange、threshold_red），THE Platform SHALL 將三個值直接寫入 thresholds.yaml 對應儀器的設定區段並立即套用。
+5. THE Platform SHALL 允許操作人員為每個 Instrument 個別設定閾值，不同 Instrument 的設定互相獨立。
+6. IF 操作人員輸入的 $T$ 值為負數或零，THEN THE Platform SHALL 拒絕該輸入並顯示驗證錯誤訊息。
+7. IF 直接設定模式中任一閾值為負數或零，THEN THE Platform SHALL 拒絕該輸入並回傳驗證錯誤（HTTP 422）。
+8. WHEN 前端設定頁面送出 `{ threshold_yellow, threshold_orange, threshold_red }` 格式的 payload 到 `POST /api/v1/instruments/{file_type}/threshold`，THE Platform SHALL 接受該 payload、回傳 HTTP 200 並包含更新後的閾值資訊。
+9. WHEN 透過程式內部以 interval_minutes 設定閾值時，THE Platform SHALL 繼續以 interval_minutes 為基礎自動計算三段閾值並正確寫入 thresholds.yaml。
+10. WHEN 查詢儀器清單 `GET /api/v1/instruments` 時，THE Platform SHALL 回傳每個儀器的 file_type、equipment_name、interval_minutes、threshold_yellow、threshold_orange、threshold_red。
 
 ---
 
-### 需求 6：電腦系統狀態顯示
+### Requirement 6: 電腦系統狀態顯示
 
-**使用者故事：** 身為操作人員，我希望在 Dashboard 上看到各電腦的系統負載、記憶體與磁碟使用率，並以三段燈號顯示嚴重程度。
+**User Story:** 身為操作人員，我希望在 Dashboard 上以統一卡片形式看到各電腦的系統負載、記憶體與磁碟使用率，並以三段燈號顯示嚴重程度，以便一眼掌握每台電腦的完整狀態。
 
 #### 硬體警戒門檻
 
 | 指標 | 黃燈 | 橙燈 | 紅燈 |
 |------|------|------|------|
-| CPU 使用率 | 連續 1 分鐘 > 80% | 連續 5 分鐘 > 80% | 連續 15 分鐘 > 80% |
 | CPU 更新逾時 | > 3 分鐘未更新 | > 10 分鐘未更新 | > 30 分鐘未更新 |
 | 記憶體負載 | > 60% | > 70% | > 80% |
 | 磁碟剩餘空間 | < 10% | < 5% | < 1% |
 
-#### 驗收標準
+#### Acceptance Criteria
 
-1. THE Dashboard SHALL 顯示各電腦的 CPU 負載（1 分鐘）、記憶體使用率（%）與磁碟使用率（%）。
-2. THE Dashboard SHALL 依科別（Department）分組顯示電腦狀態。
-3. THE Dashboard SHALL 依硬體警戒門檻以黃/橙/紅三段燈號顯示各電腦的警示狀態。
-4. WHEN CPU 使用率超過 3 分鐘未更新，THE Dashboard SHALL 以黃燈顯示（表示電腦可能關機或網路不通）。
-5. WHEN CPU 使用率超過 30 分鐘未更新，THE Dashboard SHALL 以紅燈顯示。
+##### 6.1 合併後端資料端點
+
+1. THE Platform SHALL 提供 `GET /api/v1/computers/current` 端點，回傳包含 `items` 陣列的 JSON 物件，每筆資料對應一個唯一 IP 位址。
+2. 每筆資料 SHALL 包含 `ip`、`equipment_name`、`department`、`load_1`、`load_5`、`load_15`、`memory_use`、`server_time` 及 `disks` 陣列。
+3. THE Platform SHALL 將相同 IP 的所有磁碟項目填入 `disks` 陣列，每筆包含 `file_system` 與 `used_pct`。
+4. WHEN 某台電腦沒有磁碟記錄，THE Platform SHALL 回傳空的 `disks` 陣列。
+5. IF SystemStatus 資料庫無法連線，THEN THE Platform SHALL 回傳 HTTP 503 並附上描述性錯誤訊息。
+6. IF DiskStatus 資料庫無法連線，THEN THE Platform SHALL 為每台電腦回傳空的 `disks` 陣列，並在回應中將 `disk_error` 旗標設為 `true`。
+
+##### 6.2 統一卡片版面
+
+7. THE Dashboard SHALL 為每台電腦顯示且僅顯示一張統一卡片，卡片內同時呈現系統負載與磁碟資訊。
+8. 統一卡片 SHALL 將電腦的 IP 位址顯示為卡片標題，並在下方顯示儀器名稱。
+9. 統一卡片 SHALL 以一位小數顯示記憶體使用率百分比（例如：`72.3%`）。
+10. 統一卡片 SHALL 顯示 1m、5m、15m 的 CPU 負載值，各以兩位小數呈現。
+11. 統一卡片 SHALL 顯示該電腦的所有磁碟項目，每筆顯示 `file_system` 與一位小數的 `used_pct`（例如：`/ 50.0%`、`/data 30.0%`）。
+12. WHEN 指標值不可用（null）時，統一卡片 SHALL 對該指標顯示 `N/A`。
+13. 統一卡片 SHALL 顯示該筆資料的上次更新時間。
+
+##### 6.3 科別分組與篩選
+
+14. THE Dashboard SHALL 依科別將統一卡片分組，順序為：`wrs`（氣象雷達科）、`mrs`（海象雷達科）、`sos`（衛星作業科）、`dqcs`（品管科）、`rsa`（應用科）。
+15. WHEN 電腦所屬科別不在預定義順序中，THE Dashboard SHALL 將該群組顯示在所有預定義群組之後。
+16. THE Dashboard SHALL 以中文科別名稱作為每個群組的標題。
+17. THE Dashboard SHALL 在頁面頂部提供科別篩選列（全部 / 氣象雷達科 / 海象雷達科 / 衛星作業科 / 品管科 / 應用科），設計風格與儀器即時狀況頁面相同，點擊後僅顯示對應科別的卡片。
+
+##### 6.4 警示燈號
+
+18. WHEN 記憶體使用率超過 80%，THE Dashboard SHALL 對記憶體指標套用警示等級 `red`。
+19. WHEN 記憶體使用率超過 70% 且不超過 80%，THE Dashboard SHALL 對記憶體指標套用警示等級 `orange`。
+20. WHEN 記憶體使用率超過 60% 且不超過 70%，THE Dashboard SHALL 對記憶體指標套用警示等級 `yellow`。
+21. WHEN 磁碟項目的剩餘空間（100 − used_pct）低於 1%，THE Dashboard SHALL 對該磁碟項目套用警示等級 `red`。
+22. WHEN 磁碟項目的剩餘空間低於 5% 且不低於 1%，THE Dashboard SHALL 對該磁碟項目套用警示等級 `orange`。
+23. WHEN 磁碟項目的剩餘空間低於 10% 且不低於 5%，THE Dashboard SHALL 對該磁碟項目套用警示等級 `yellow`。
+24. WHEN CPU 逾時超過 30 分鐘，THE Dashboard SHALL 對卡片邊框套用警示等級 `red`。
+25. WHEN CPU 逾時超過 10 分鐘且不超過 30 分鐘，THE Dashboard SHALL 對卡片邊框套用警示等級 `orange`。
+26. WHEN CPU 逾時超過 3 分鐘且不超過 10 分鐘，THE Dashboard SHALL 對卡片邊框套用警示等級 `yellow`。
+27. THE Dashboard SHALL 將所有指標（記憶體、所有磁碟、CPU 逾時）中最嚴重的警示等級套用至整張卡片的邊框顏色。
+
+##### 6.5 自動刷新與手動刷新
+
+28. THE Dashboard SHALL 每 60 秒自動從電腦狀態 API 刷新資料。
+29. WHEN 刷新按鈕被點擊，THE Dashboard SHALL 立即取得最新資料並重置 60 秒自動刷新計時器。
+30. WHEN 資料取得成功，THE Dashboard SHALL 將「上次更新」時間戳記更新為當前本地時間。
+31. IF 資料取得因網路錯誤或逾時而失敗，THEN THE Dashboard SHALL 顯示警告訊息，且不清除已渲染的卡片。
+32. IF 資料取得因伺服器錯誤（HTTP 5xx）而失敗，THEN THE Dashboard SHALL 顯示錯誤訊息，說明資料庫連線失敗。
+
+##### 6.6 移除舊版雙區塊版面
+
+33. THE Dashboard SHALL 使用單一 `<section>` 元素（id 為 `computers-container`）容納所有統一卡片，取代原本的 `system-container` 與 `disk-container` 元素。
+34. THE Dashboard SHALL 不再從電腦頁面直接呼叫舊版的 `/api/v1/system/current` 或 `/api/v1/disk/current` 端點。
 
 ---
 
-### 需求 7：儀器歷史資料時序圖
+### Requirement 7: 儀器歷史資料時序圖
 
-**使用者故事：** 身為操作人員，我希望點擊某個儀器卡片後，能在新分頁看到該儀器的資料時間差歷史趨勢圖，以及同一台電腦的 CPU、記憶體、磁碟使用率時序圖，以便判斷異常是偶發還是持續性問題。
+**User Story:** 身為操作人員，我希望點擊某個儀器卡片後，能在新分頁看到該儀器的資料時間差歷史趨勢圖，以及同一台電腦的 CPU、記憶體、磁碟使用率時序圖，以便判斷異常是偶發還是持續性問題。
 
-#### 驗收標準
+#### Acceptance Criteria
 
 1. WHEN 操作人員點擊儀器狀態頁面上的某個儀器卡片，THE Platform SHALL 在新分頁開啟該儀器的歷史資料頁面。
 2. THE 歷史資料頁面 SHALL 顯示該儀器（FileType + IP）的資料時間差（DiffTime，單位：分鐘）時序折線圖。
@@ -161,3 +222,20 @@
 7. THE Platform SHALL 從 `radarStatus`、`HFradarStatus`、`satelliteStatus`、`windprofilerStatus`、`DSStatus` 等歷史資料表取得儀器 DiffTime 歷史記錄。
 8. THE Platform SHALL 從 `SystemStatus.CheckList` 取得 CPU 與記憶體歷史記錄，從 `DiskStatus.CheckList` 取得磁碟使用率歷史記錄。
 9. IF 指定時間範圍內無歷史資料，THE 歷史資料頁面 SHALL 顯示「此時間範圍內無資料」提示。
+
+---
+
+### Requirement 8: 電腦歷史資料時序圖
+
+**User Story:** 身為操作人員，我希望點擊電腦狀態頁面上的某張統一卡片後，能在新分頁看到該電腦的 CPU、記憶體、磁碟使用率時序圖，同時以卡片形式列出該電腦所有相關儀器的即時狀態，以便判斷異常是偶發還是持續性問題。
+
+#### Acceptance Criteria
+
+1. WHEN 操作人員點擊電腦狀態頁面上的某張統一卡片，THE Platform SHALL 在新分頁開啟該電腦的歷史資料頁面。
+2. THE 歷史資料頁面 SHALL 提供時間範圍選擇器，選項為：過去 6 小時、1 天、1 週、1 個月、3 個月。
+3. WHEN 操作人員切換時間範圍，THE 歷史資料頁面 SHALL 重新向後端取得對應區間的資料並更新圖表。
+4. THE 歷史資料頁面 SHALL 顯示該電腦的 CPU 負載（Load_1）、記憶體使用率（MemoryUSE）、磁碟使用率（Used）三張時序折線圖。
+5. THE 時序圖 SHALL 在 Y 軸疊加顯示黃色、橙色、紅色三條閾值水平線，對應各指標的硬體警戒門檻。
+6. THE 歷史資料頁面 SHALL 以卡片形式列出該電腦（同 IP）所有相關儀器的即時狀態，顯示方式與儀器即時狀況頁面的卡片相同。
+7. THE Platform SHALL 從 `SystemStatus.CheckList` 取得 CPU 與記憶體歷史記錄，從 `DiskStatus.CheckList` 取得磁碟使用率歷史記錄。
+8. IF 指定時間範圍內無歷史資料，THE 歷史資料頁面 SHALL 顯示「此時間範圍內無資料」提示。

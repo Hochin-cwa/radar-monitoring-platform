@@ -89,22 +89,20 @@
 <body>
   <header>
     <div class="header-left">
-      <a href="/instruments.html" class="back-link">← 儀器即時狀況</a>
+      <a href="/instruments.html" class="back-link" id="back-link">← 儀器即時狀況</a>
       <h1 id="page-title">歷史資料</h1>
     </div>
     <div class="time-bar">
       <span class="history-header-info">IP：<strong id="header-ip">--</strong></span>
-      <span class="history-header-info">FileType：<strong id="header-filetype">--</strong></span>
+      <span class="history-header-info" id="header-filetype-wrap">FileType：<strong id="header-filetype">--</strong></span>
     </div>
   </header>
 
   <main>
     <div id="status-bar" class="status-bar hidden"></div>
 
-    <!-- DiffTime 主圖 -->
-    <div class="section">
-      <h2>資料時間差（DiffTime）</h2>
-
+    <!-- 共用時間範圍選擇器 -->
+    <div class="section" id="range-section">
       <div class="range-bar">
         <button class="range-btn" data-range="6h">6 小時</button>
         <button class="range-btn active" data-range="1d">1 天</button>
@@ -112,6 +110,11 @@
         <button class="range-btn" data-range="1m">1 個月</button>
         <button class="range-btn" data-range="3m">3 個月</button>
       </div>
+    </div>
+
+    <!-- DiffTime 主圖（僅儀器模式顯示） -->
+    <div class="section" id="diff-section">
+      <h2>資料時間差（DiffTime）</h2>
 
       <div class="chart-wrapper">
         <canvas id="diff-chart"></canvas>
@@ -143,6 +146,14 @@
           <canvas id="disk-chart"></canvas>
           <div id="disk-no-data" class="no-data hidden">此時間範圍內無資料</div>
         </div>
+      </div>
+    </div>
+
+    <!-- 相關儀器即時狀態（僅電腦模式顯示） -->
+    <div class="section hidden" id="related-section">
+      <h2>相關儀器即時狀態</h2>
+      <div id="related-container" class="group-cards">
+        <p class="loading">載入中…</p>
       </div>
     </div>
   </main>
