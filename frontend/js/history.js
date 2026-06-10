@@ -40,6 +40,13 @@
 
   const DISCONNECT_THRESHOLD_MIN = 14400;
 
+  // ── CPU 三段負載線設定（一張圖三條線：1m / 5m / 15m） ─────
+  const CPU_SERIES = [
+    { key: 'load_1',  label: 'Load 1m',  color: 'rgb(74,222,128)' },
+    { key: 'load_5',  label: 'Load 5m',  color: 'rgb(56,189,248)' },
+    { key: 'load_15', label: 'Load 15m', color: 'rgb(167,139,250)' },
+  ];
+
   // ── 頁面標題與表頭 ────────────────────────────────────────
   if (COMPUTER_MODE) {
     const name = EQUIPMENT_NAME || IP;
@@ -180,6 +187,50 @@
       _diffChart.update('none');
     } else {
       _diffChart = new Chart(canvas, { type: 'line', data: { datasets }, options });
+    }
+  }
+
+  // ── 建立或更新多線系統圖（一張圖多條時序線，例如 CPU 三段負載） ──
+  function renderMultiSeriesChart(chartRef, canvasId, noDataId, data, series, yLabel) {
+    const noDataEl = document.getElementById(noDataId);
+    const canvas = document.getElementById(canvasId);
+
+    // 任一系列有資料即視為有資料
+    const hasData = Array.isArray(data) && data.length > 0;
+    if (!hasData) {
+      noDataEl.classList.remove('hidden');
+      canvas.style.display = 'none';
+      if (chartRef.instance) { chartRef.instance.destroy(); chartRef.instance = null; }
+      return;
+    }
+
+    noDataEl.classList.add('hidden');
+    canvas.style.display = '';
+
+    const datasets = series.map((s, idx) => ({
+      label: s.label,
+      data: data.map(d => ({ x: d.time, y: d[s.key] })),
+      borderColor: s.color,
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      fill: false,
+      tension: 0.2,
+      order: idx,
+    }));
+
+    const options = baseChartOptions(yLabel);
+    options.plugins.legend = {
+      display: true,
+      labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 16 },
+    };
+
+    if (chartRef.instance && chartRef.instance.data.datasets.length === datasets.length) {
+      chartRef.instance.data.datasets = datasets;
+      chartRef.instance.update('none');
+    } else {
+      if (chartRef.instance) { chartRef.instance.destroy(); }
+      chartRef.instance = new Chart(canvas, { type: 'line', data: { datasets }, options });
     }
   }
 
@@ -338,7 +389,7 @@
     try {
       if (COMPUTER_MODE) {
         const sysData = await fetchSystemHistory(IP, range);
-        renderSystemChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, 'load_1', 'Load_1', 'rgb(74,222,128)');
+        renderMultiSeriesChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, CPU_SERIES, 'Load');
         renderSystemChart(_memRef, 'memory-chart', 'memory-no-data', sysData.memory, 'memory_use', 'MemoryUSE %', 'rgb(251,191,36)', MEM_THRESHOLDS);
         renderSystemChart(_diskRef, 'disk-chart', 'disk-no-data', sysData.disk, 'used', 'Used %', 'rgb(251,146,60)', DISK_THRESHOLDS);
       } else {
@@ -354,7 +405,7 @@
           instrData.threshold_red,
         );
 
-        renderSystemChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, 'load_1', 'Load_1', 'rgb(74,222,128)');
+        renderMultiSeriesChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, CPU_SERIES, 'Load');
         renderSystemChart(_memRef, 'memory-chart', 'memory-no-data', sysData.memory, 'memory_use', 'MemoryUSE %', 'rgb(251,191,36)');
         renderSystemChart(_diskRef, 'disk-chart', 'disk-no-data', sysData.disk, 'used', 'Used %', 'rgb(251,146,60)');
       }

@@ -104,7 +104,7 @@ def get_system_history(ip: str, range: str) -> dict:
     # 與 CheckList（每 IP 僅保留最新一筆的即時快照表）不同，
     # 因此 CPU / 記憶體時序圖須從 Status 取得完整歷史。
     _SYS_SQL = text("""
-        SELECT ServerTime, Load_1, MemoryUSE
+        SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
         FROM Status
         WHERE IP = :ip
           AND ServerTime >= :start_dt
@@ -140,6 +140,8 @@ def get_system_history(ip: str, range: str) -> dict:
             cpu_data.append({
                 "time": t_iso,
                 "load_1": float(row.Load_1) if row.Load_1 is not None else None,
+                "load_5": float(row.Load_5) if row.Load_5 is not None else None,
+                "load_15": float(row.LOAD_15) if row.LOAD_15 is not None else None,
             })
             memory_data.append({
                 "time": t_iso,

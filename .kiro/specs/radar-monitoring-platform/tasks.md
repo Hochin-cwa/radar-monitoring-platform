@@ -100,8 +100,8 @@
     - _Requirements: 7.2, 7.3, 7.7_
 
   - [x] 5.2 實作電腦系統歷史資料查詢
-    - `get_system_history(ip, range)`：查詢 SystemStatus.CheckList（CPU/記憶體）與 DiskStatus.CheckList（磁碟）
-    - 回傳 cpu、memory、disk 三組時序資料
+    - `get_system_history(ip, range)`：查詢 SystemStatus.Status（CPU 負載 Load_1/Load_5/Load_15 與記憶體 MemoryUSE）與 DiskStatus.CheckList（磁碟 Used）
+    - 回傳 cpu（含 load_1/load_5/load_15）、memory、disk 三組時序資料
     - _Requirements: 7.6, 7.8, 8.4, 8.7_
 
   - [ ]* 5.3 撰寫歷史資料表對應屬性測試
