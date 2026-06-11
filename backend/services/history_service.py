@@ -69,7 +69,7 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     tables until data is found.
     """
     start_dt = _parse_range(range)
-    start_ts = start_dt.timestamp()
+    start_ts = int(start_dt.timestamp())
 
     timeout = get_config().system.query_timeout_seconds
     t_yellow, t_orange, t_red = get_instrument_thresholds(file_type)
@@ -77,6 +77,11 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     # Order tables: best guess first, then the rest
     guessed = _table_for_file_type(file_type)
     tables_to_try = [guessed] + [t for t in _STATUS_TABLES if t != guessed]
+
+    logger.info(
+        "get_instrument_history: file_type=%s, ip=%s, range=%s, start_ts=%d, tables=%s",
+        file_type, ip, range, start_ts, tables_to_try,
+    )
 
     rows = []
     for table in tables_to_try:
@@ -105,6 +110,8 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
                 len(rows), table, file_type, ip,
             )
             break
+        else:
+            logger.info("get_instrument_history: no rows in table '%s' for %s/%s", table, file_type, ip)
 
     data = []
     for row in rows:
@@ -131,9 +138,17 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 def get_system_history(ip: str, range: str) -> dict:
     """Query CPU, memory (SystemStatus) and disk (DiskStatus) history for an IP."""
     start_dt = _parse_range(range)
+    start_ts = int(start_dt.timestamp())
     timeout = get_config().system.query_timeout_seconds
 
-    _SYS_SQL = text("""
+    logger.info(
+        "get_system_history: ip=%s, range=%s, start_dt=%s, start_ts=%d",
+        ip, range, start_dt.isoformat(), start_ts,
+    )
+
+    # Try both: datetime comparison and unix timestamp comparison
+    # Some tables store ServerTime as DATETIME, others as INT (unix timestamp)
+    _SYS_SQL_DATETIME = text("""
         SELECT ServerTime, Load_1, MemoryUSE
         FROM CheckList
         WHERE IP = :ip
@@ -141,7 +156,7 @@ def get_system_history(ip: str, range: str) -> dict:
         ORDER BY ServerTime ASC
     """)
 
-    _DISK_SQL = text("""
+    _DISK_SQL_DATETIME = text("""
         SELECT ServerTime, Used
         FROM CheckList
         WHERE IP = :ip
@@ -156,15 +171,18 @@ def get_system_history(ip: str, range: str) -> dict:
     try:
         with get_session("system_status") as session:
             rows = session.execute(
-                _SYS_SQL.execution_options(timeout=timeout),
+                _SYS_SQL_DATETIME.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
+        logger.info("get_system_history (system_status): got %d rows for ip=%s", len(rows), ip)
         for row in rows:
             if row.ServerTime is None:
                 continue
             t = row.ServerTime
             if isinstance(t, datetime):
                 t_iso = t.isoformat()
+            elif isinstance(t, (int, float)):
+                t_iso = datetime.fromtimestamp(float(t)).isoformat()
             else:
                 t_iso = str(t)
             cpu_data.append({
@@ -181,15 +199,18 @@ def get_system_history(ip: str, range: str) -> dict:
     try:
         with get_session("disk_status") as session:
             rows = session.execute(
-                _DISK_SQL.execution_options(timeout=timeout),
+                _DISK_SQL_DATETIME.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
+        logger.info("get_system_history (disk_status): got %d rows for ip=%s", len(rows), ip)
         for row in rows:
             if row.ServerTime is None:
                 continue
             t = row.ServerTime
             if isinstance(t, datetime):
                 t_iso = t.isoformat()
+            elif isinstance(t, (int, float)):
+                t_iso = datetime.fromtimestamp(float(t)).isoformat()
             else:
                 t_iso = str(t)
             disk_data.append({
