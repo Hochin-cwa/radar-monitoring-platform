@@ -54,8 +54,9 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     timeout = get_config().system.query_timeout_seconds
     t_yellow, t_orange, t_red = get_instrument_thresholds(file_type)
 
+    # FileTime 為 Unix timestamp（秒），直接在 SQL 端以 FROM_UNIXTIME 轉成 datetime。
     sql = text(f"""
-        SELECT FileTime, DiffTime
+        SELECT FROM_UNIXTIME(FileTime) AS Time, DiffTime
         FROM {table}
         WHERE IP = :ip
           AND FileType = :file_type
@@ -75,11 +76,15 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 
     data = []
     for row in rows:
-        if row.FileTime is None:
+        if row.Time is None:
             continue
-        dt = datetime.fromtimestamp(float(row.FileTime), tz=timezone.utc)
+        t = row.Time
+        if isinstance(t, datetime):
+            t_iso = t.replace(tzinfo=timezone.utc).isoformat() if t.tzinfo is None else t.isoformat()
+        else:
+            t_iso = str(t)
         data.append({
-            "time": dt.isoformat(),
+            "time": t_iso,
             # DiffTime 欄位單位為秒，換算成分鐘後回傳
             "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
         })
