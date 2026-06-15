@@ -66,7 +66,8 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     """Query instrument DiffTime history from status tables.
 
     Tries the best-guess table first; if no data is found, queries remaining
-    tables until data is found.
+    tables until data is found. If no data found with the given IP, retries
+    without the IP filter to find data under any IP for that FileType.
     """
     start_dt = _parse_range(range)
     start_ts = int(start_dt.timestamp())
@@ -83,8 +84,43 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
         file_type, ip, range, start_ts, tables_to_try,
     )
 
-    rows = []
-    for table in tables_to_try:
+    # First pass: query with both IP and FileType
+    rows = _query_instrument_tables(tables_to_try, ip, file_type, start_ts, timeout)
+
+    # Second pass: if no data with given IP, try without IP filter
+    actual_ip = ip
+    if not rows:
+        logger.info(
+            "get_instrument_history: no data for ip=%s, retrying without IP filter", ip
+        )
+        rows, actual_ip = _query_instrument_tables_any_ip(
+            tables_to_try, file_type, start_ts, timeout
+        )
+
+    data = []
+    for row in rows:
+        if row.FileTime is None:
+            continue
+        dt = datetime.fromtimestamp(float(row.FileTime))
+        data.append({
+            "time": dt.isoformat(),
+            "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
+        })
+
+    return {
+        "file_type": file_type,
+        "ip": actual_ip,
+        "range": range,
+        "threshold_yellow": t_yellow,
+        "threshold_orange": t_orange,
+        "threshold_red": t_red,
+        "data": data,
+    }
+
+
+def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
+    """Query all tables with IP + FileType filter. Return first non-empty result."""
+    for table in tables:
         sql = text(f"""
             SELECT FileTime, DiffTime
             FROM {table}
@@ -92,8 +128,7 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
               AND FileType = :file_type
               AND FileTime >= :start_ts
             ORDER BY FileTime ASC
-        """)  # nosec — table name is controlled internally, not user input
-
+        """)
         try:
             with get_session("file_status") as session:
                 rows = session.execute(
@@ -109,30 +144,40 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
                 "get_instrument_history: found %d rows in table '%s' for %s/%s",
                 len(rows), table, file_type, ip,
             )
-            break
+            return rows
         else:
             logger.info("get_instrument_history: no rows in table '%s' for %s/%s", table, file_type, ip)
+    return []
 
-    data = []
-    for row in rows:
-        if row.FileTime is None:
-            continue
-        dt = datetime.fromtimestamp(float(row.FileTime))
-        data.append({
-            "time": dt.isoformat(),
-            # DiffTime 欄位單位為秒，換算成分鐘後回傳
-            "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
-        })
 
-    return {
-        "file_type": file_type,
-        "ip": ip,
-        "range": range,
-        "threshold_yellow": t_yellow,
-        "threshold_orange": t_orange,
-        "threshold_red": t_red,
-        "data": data,
-    }
+def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
+    """Query all tables with only FileType filter (no IP). Return rows and found IP."""
+    for table in tables:
+        sql = text(f"""
+            SELECT IP, FileTime, DiffTime
+            FROM {table}
+            WHERE FileType = :file_type
+              AND FileTime >= :start_ts
+            ORDER BY FileTime ASC
+        """)
+        try:
+            with get_session("file_status") as session:
+                rows = session.execute(
+                    sql.execution_options(timeout=timeout),
+                    {"file_type": file_type, "start_ts": start_ts},
+                ).fetchall()
+        except (OperationalError, SQLAlchemyError) as exc:
+            logger.warning("get_instrument_history: table '%s' (any IP) query error: %s", table, exc)
+            rows = []
+
+        if rows:
+            found_ip = rows[0].IP if rows[0].IP else ""
+            logger.info(
+                "get_instrument_history: found %d rows in table '%s' for %s (any IP, actual=%s)",
+                len(rows), table, file_type, found_ip,
+            )
+            return rows, found_ip
+    return [], ""
 
 
 def get_system_history(ip: str, range: str) -> dict:

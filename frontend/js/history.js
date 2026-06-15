@@ -209,10 +209,8 @@
     hideError();
 
     try {
-      const [instrData, sysData] = await Promise.all([
-        fetchInstrumentHistory(FILE_TYPE, IP, range),
-        fetchSystemHistory(IP, range),
-      ]);
+      // First fetch instrument history — backend may resolve to actual IP
+      const instrData = await fetchInstrumentHistory(FILE_TYPE, IP, range);
 
       renderDiffChart(
         instrData.data,
@@ -220,6 +218,17 @@
         instrData.threshold_orange,
         instrData.threshold_red,
       );
+
+      // Use the actual IP returned by instrument history for system queries
+      const actualIp = instrData.ip || IP;
+
+      // Fetch system history with actual IP; also try URL IP if different
+      let sysData = await fetchSystemHistory(actualIp, range);
+
+      // If system data is empty and actualIp differs from URL IP, try URL IP
+      if ((!sysData.cpu || sysData.cpu.length === 0) && actualIp !== IP) {
+        sysData = await fetchSystemHistory(IP, range);
+      }
 
       renderSystemChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, 'load_1', 'Load_1', 'rgb(74,222,128)');
       renderSystemChart(_memRef, 'memory-chart', 'memory-no-data', sysData.memory, 'memory_use', 'MemoryUSE %', 'rgb(251,191,36)');
