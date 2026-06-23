@@ -119,32 +119,8 @@
       </div>
     </div>
 
-    <!-- 系統狀態圖 -->
-    <div class="system-charts-grid">
-      <div class="system-chart-card">
-        <h3>CPU 負載（Load_1）</h3>
-        <div class="system-chart-wrapper">
-          <canvas id="cpu-chart"></canvas>
-          <div id="cpu-no-data" class="no-data hidden">此時間範圍內無資料</div>
-        </div>
-      </div>
-
-      <div class="system-chart-card">
-        <h3>記憶體使用率（MemoryUSE %）</h3>
-        <div class="system-chart-wrapper">
-          <canvas id="memory-chart"></canvas>
-          <div id="memory-no-data" class="no-data hidden">此時間範圍內無資料</div>
-        </div>
-      </div>
-
-      <div class="system-chart-card">
-        <h3>磁碟使用率（Used %）</h3>
-        <div class="system-chart-wrapper">
-          <canvas id="disk-chart"></canvas>
-          <div id="disk-no-data" class="no-data hidden">此時間範圍內無資料</div>
-        </div>
-      </div>
-    </div>
+    <!-- 系統狀態圖（動態生成） -->
+    <div id="system-charts-grid" class="system-charts-grid"></div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>

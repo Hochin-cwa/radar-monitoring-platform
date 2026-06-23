@@ -26,9 +26,6 @@
 
   // ── Chart 實例 ────────────────────────────────────────────
   let _diffChart = null;
-  let _cpuChart = null;
-  let _memoryChart = null;
-  let _diskChart = null;
 
   // ── 共用 Chart.js 時間軸選項 ──────────────────────────────
   function timeScaleOptions() {
@@ -145,14 +142,17 @@
   }
 
   // ── 建立或更新系統圖（通用） ──────────────────────────────
-  function renderSystemChart(chartRef, canvasId, noDataId, data, valueKey, yLabel, color) {
+  // chartInstances stores { canvasId: Chart instance }
+  const _chartInstances = {};
+
+  function renderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color) {
     const noDataEl = document.getElementById(noDataId);
     const canvas = document.getElementById(canvasId);
 
     if (!data || data.length === 0) {
       noDataEl.classList.remove('hidden');
       canvas.style.display = 'none';
-      if (chartRef.instance) { chartRef.instance.destroy(); chartRef.instance = null; }
+      if (_chartInstances[canvasId]) { _chartInstances[canvasId].destroy(); delete _chartInstances[canvasId]; }
       return;
     }
 
@@ -171,15 +171,109 @@
       tension: 0.2,
     };
 
-    if (chartRef.instance) {
-      chartRef.instance.data.datasets[0].data = points;
-      chartRef.instance.update('none');
+    if (_chartInstances[canvasId]) {
+      _chartInstances[canvasId].data.datasets[0].data = points;
+      _chartInstances[canvasId].update('none');
     } else {
-      chartRef.instance = new Chart(canvas, {
+      _chartInstances[canvasId] = new Chart(canvas, {
         type: 'line',
         data: { datasets: [dataset] },
         options: baseChartOptions(yLabel),
       });
+    }
+  }
+
+  /**
+   * Dynamically build system chart cards and render charts.
+   * cpu: { load_1: [...], load_5: [...], load_15: [...] }
+   * memory: [...]
+   * disk: { "/path1": [...], "/path2": [...] }
+   */
+  function renderSystemCharts(sysData) {
+    const grid = document.getElementById('system-charts-grid');
+
+    // Destroy existing chart instances before rebuilding DOM
+    Object.keys(_chartInstances).forEach(id => {
+      if (id !== 'diff-chart') {
+        _chartInstances[id].destroy();
+        delete _chartInstances[id];
+      }
+    });
+
+    const cards = [];
+
+    // CPU Load cards
+    const cpuConfigs = [
+      { key: 'load_1', label: 'CPU 負載（Load_1）', color: 'rgb(74,222,128)' },
+      { key: 'load_5', label: 'CPU 負載（Load_5）', color: 'rgb(52,211,153)' },
+      { key: 'load_15', label: 'CPU 負載（Load_15）', color: 'rgb(16,185,129)' },
+    ];
+
+    const cpuData = sysData.cpu || {};
+    for (const cfg of cpuConfigs) {
+      const data = cpuData[cfg.key] || [];
+      const canvasId = `chart-cpu-${cfg.key}`;
+      const noDataId = `nodata-cpu-${cfg.key}`;
+      cards.push({ title: cfg.label, canvasId, noDataId, data, valueKey: 'value', yLabel: cfg.key, color: cfg.color });
+    }
+
+    // Memory card
+    const memData = sysData.memory || [];
+    cards.push({
+      title: '記憶體使用率（MemoryUSE %）',
+      canvasId: 'chart-memory',
+      noDataId: 'nodata-memory',
+      data: memData,
+      valueKey: 'value',
+      yLabel: 'MemoryUSE %',
+      color: 'rgb(251,191,36)',
+    });
+
+    // Disk cards — one per FileSystem path
+    const diskData = sysData.disk || {};
+    const diskPaths = Object.keys(diskData).sort();
+    for (const fsPath of diskPaths) {
+      const safeId = fsPath.replace(/[^a-zA-Z0-9]/g, '_');
+      const canvasId = `chart-disk-${safeId}`;
+      const noDataId = `nodata-disk-${safeId}`;
+      cards.push({
+        title: `磁碟使用率（${fsPath}）`,
+        canvasId,
+        noDataId,
+        data: diskData[fsPath],
+        valueKey: 'used',
+        yLabel: 'Used %',
+        color: 'rgb(251,146,60)',
+      });
+    }
+
+    // If no disk data at all, show one empty disk card
+    if (diskPaths.length === 0) {
+      cards.push({
+        title: '磁碟使用率（Used %）',
+        canvasId: 'chart-disk-empty',
+        noDataId: 'nodata-disk-empty',
+        data: [],
+        valueKey: 'used',
+        yLabel: 'Used %',
+        color: 'rgb(251,146,60)',
+      });
+    }
+
+    // Build HTML
+    grid.innerHTML = cards.map(c => `
+      <div class="system-chart-card">
+        <h3>${c.title}</h3>
+        <div class="system-chart-wrapper">
+          <canvas id="${c.canvasId}"></canvas>
+          <div id="${c.noDataId}" class="no-data hidden">此時間範圍內無資料</div>
+        </div>
+      </div>
+    `).join('');
+
+    // Render each chart
+    for (const c of cards) {
+      renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
     }
   }
 
@@ -196,9 +290,6 @@
   }
 
   // ── 載入並渲染所有圖表 ────────────────────────────────────
-  const _cpuRef = {};
-  const _memRef = {};
-  const _diskRef = {};
 
   async function loadAll(range) {
     if (!FILE_TYPE || !IP) {
@@ -226,13 +317,12 @@
       let sysData = await fetchSystemHistory(actualIp, range);
 
       // If system data is empty and actualIp differs from URL IP, try URL IP
-      if ((!sysData.cpu || sysData.cpu.length === 0) && actualIp !== IP) {
+      const hasCpuData = sysData.cpu && (sysData.cpu.load_1 || []).length > 0;
+      if (!hasCpuData && actualIp !== IP) {
         sysData = await fetchSystemHistory(IP, range);
       }
 
-      renderSystemChart(_cpuRef, 'cpu-chart', 'cpu-no-data', sysData.cpu, 'load_1', 'Load_1', 'rgb(74,222,128)');
-      renderSystemChart(_memRef, 'memory-chart', 'memory-no-data', sysData.memory, 'memory_use', 'MemoryUSE %', 'rgb(251,191,36)');
-      renderSystemChart(_diskRef, 'disk-chart', 'disk-no-data', sysData.disk, 'used', 'Used %', 'rgb(251,146,60)');
+      renderSystemCharts(sysData);
     } catch (err) {
       const msg = err.type === 'timeout'
         ? '請求逾時，請稍後再試'

@@ -101,9 +101,11 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     for row in rows:
         if row.FileTime is None:
             continue
-        dt = datetime.fromtimestamp(float(row.FileTime))
+        file_time_ts = float(row.FileTime)
+        dt = datetime.fromtimestamp(file_time_ts)
         data.append({
             "time": dt.isoformat(),
+            "file_time": int(file_time_ts),
             "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
         })
 
@@ -181,7 +183,11 @@ def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
 
 
 def get_system_history(ip: str, range: str) -> dict:
-    """Query CPU, memory (SystemStatus) and disk (DiskStatus) history for an IP."""
+    """Query CPU, memory (SystemStatus) and disk (DiskStatus) history for an IP.
+
+    CPU loads are split into separate arrays: load_1, load_5, load_15.
+    Disk data is grouped by FileSystem path into a dict keyed by file_system.
+    """
     start_dt = _parse_range(range)
     start_ts = int(start_dt.timestamp())
     timeout = get_config().system.query_timeout_seconds
@@ -191,32 +197,31 @@ def get_system_history(ip: str, range: str) -> dict:
         ip, range, start_dt.isoformat(), start_ts,
     )
 
-    # Try both: datetime comparison and unix timestamp comparison
-    # Some tables store ServerTime as DATETIME, others as INT (unix timestamp)
-    _SYS_SQL_DATETIME = text("""
-        SELECT ServerTime, Load_1, MemoryUSE
+    _SYS_SQL = text("""
+        SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
         FROM CheckList
         WHERE IP = :ip
           AND ServerTime >= :start_dt
         ORDER BY ServerTime ASC
     """)
 
-    _DISK_SQL_DATETIME = text("""
-        SELECT ServerTime, Used
+    _DISK_SQL = text("""
+        SELECT ServerTime, FileSystem, Used
         FROM CheckList
         WHERE IP = :ip
           AND ServerTime >= :start_dt
         ORDER BY ServerTime ASC
     """)
 
-    cpu_data: list[dict] = []
+    load_1_data: list[dict] = []
+    load_5_data: list[dict] = []
+    load_15_data: list[dict] = []
     memory_data: list[dict] = []
-    disk_data: list[dict] = []
 
     try:
         with get_session("system_status") as session:
             rows = session.execute(
-                _SYS_SQL_DATETIME.execution_options(timeout=timeout),
+                _SYS_SQL.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
         logger.info("get_system_history (system_status): got %d rows for ip=%s", len(rows), ip)
@@ -230,21 +235,31 @@ def get_system_history(ip: str, range: str) -> dict:
                 t_iso = datetime.fromtimestamp(float(t)).isoformat()
             else:
                 t_iso = str(t)
-            cpu_data.append({
+            load_1_data.append({
                 "time": t_iso,
-                "load_1": float(row.Load_1) if row.Load_1 is not None else None,
+                "value": float(row.Load_1) if row.Load_1 is not None else None,
+            })
+            load_5_data.append({
+                "time": t_iso,
+                "value": float(row.Load_5) if row.Load_5 is not None else None,
+            })
+            load_15_data.append({
+                "time": t_iso,
+                "value": float(row.LOAD_15) if row.LOAD_15 is not None else None,
             })
             memory_data.append({
                 "time": t_iso,
-                "memory_use": float(row.MemoryUSE) if row.MemoryUSE is not None else None,
+                "value": float(row.MemoryUSE) if row.MemoryUSE is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:
         logger.error("get_system_history (system_status): DB error: %s", exc)
 
+    # Disk: group by FileSystem path
+    disk_by_fs: dict[str, list[dict]] = {}
     try:
         with get_session("disk_status") as session:
             rows = session.execute(
-                _DISK_SQL_DATETIME.execution_options(timeout=timeout),
+                _DISK_SQL.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
         logger.info("get_system_history (disk_status): got %d rows for ip=%s", len(rows), ip)
@@ -258,7 +273,8 @@ def get_system_history(ip: str, range: str) -> dict:
                 t_iso = datetime.fromtimestamp(float(t)).isoformat()
             else:
                 t_iso = str(t)
-            disk_data.append({
+            fs = row.FileSystem or "unknown"
+            disk_by_fs.setdefault(fs, []).append({
                 "time": t_iso,
                 "used": float(row.Used) if row.Used is not None else None,
             })
@@ -268,7 +284,11 @@ def get_system_history(ip: str, range: str) -> dict:
     return {
         "ip": ip,
         "range": range,
-        "cpu": cpu_data,
+        "cpu": {
+            "load_1": load_1_data,
+            "load_5": load_5_data,
+            "load_15": load_15_data,
+        },
         "memory": memory_data,
-        "disk": disk_data,
+        "disk": disk_by_fs,
     }
