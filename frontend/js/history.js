@@ -189,25 +189,28 @@
 
   /**
    * Dynamically build system chart cards and render charts.
-   * cpu: { load_1: [...], load_5: [...], load_15: [...] }
-   * memory: [...]
-   * disk: { "/path1": [...], "/path2": [...] }
+   * API: GET /api/v1/history/system?ip=...&range=...
+   * Response format:
+   *   cpu: { load_1: [{time, value}], load_5: [...], load_15: [...] }
+   *   memory: [{time, value}]
+   *   disk: { "/path1": [{time, used}], "/path2": [...] }
+   *
+   * CPU/Memory data comes from SystemStatus DB (Status table).
+   * Disk data comes from DiskStatus DB (Status table).
    */
   function renderSystemCharts(sysData) {
-    const grid = document.getElementById('system-charts-grid');
-    if (!grid) return;
+    const cpuMemGrid = document.getElementById('cpu-memory-charts-grid');
+    const diskGrid = document.getElementById('disk-charts-grid');
 
     // Destroy existing chart instances before rebuilding DOM
     Object.keys(_chartInstances).forEach(id => {
-      if (id !== 'diff-chart') {
-        _chartInstances[id].destroy();
-        delete _chartInstances[id];
-      }
+      _chartInstances[id].destroy();
+      delete _chartInstances[id];
     });
 
-    const cards = [];
+    // ── CPU + Memory cards ──
+    const cpuMemCards = [];
 
-    // CPU Load cards
     const cpuConfigs = [
       { key: 'load_1', label: 'CPU 負載（Load_1）', color: 'rgb(74,222,128)' },
       { key: 'load_5', label: 'CPU 負載（Load_5）', color: 'rgb(52,211,153)' },
@@ -219,12 +222,12 @@
       const data = Array.isArray(cpuData[cfg.key]) ? cpuData[cfg.key] : [];
       const canvasId = `chart-cpu-${cfg.key}`;
       const noDataId = `nodata-cpu-${cfg.key}`;
-      cards.push({ title: cfg.label, canvasId, noDataId, data, valueKey: 'value', yLabel: cfg.key, color: cfg.color });
+      cpuMemCards.push({ title: cfg.label, canvasId, noDataId, data, valueKey: 'value', yLabel: cfg.key, color: cfg.color });
     }
 
     // Memory card
     const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
-    cards.push({
+    cpuMemCards.push({
       title: '記憶體使用率（MemoryUSE %）',
       canvasId: 'chart-memory',
       noDataId: 'nodata-memory',
@@ -234,28 +237,45 @@
       color: 'rgb(251,191,36)',
     });
 
-    // Disk cards — one per FileSystem path
-    const diskData = (sysData.disk && typeof sysData.disk === 'object') ? sysData.disk : {};
-    const diskPaths = Object.keys(diskData).sort();
+    if (cpuMemGrid) {
+      cpuMemGrid.innerHTML = cpuMemCards.map(c => `
+        <div class="system-chart-card">
+          <h3>${c.title}</h3>
+          <div class="system-chart-wrapper">
+            <canvas id="${c.canvasId}"></canvas>
+            <div id="${c.noDataId}" class="no-data hidden">此時間範圍內無資料</div>
+          </div>
+        </div>
+      `).join('');
+
+      for (const c of cpuMemCards) {
+        renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+      }
+    }
+
+    // ── Disk cards ──
+    const diskCards = [];
+    const diskDataObj = (sysData.disk && typeof sysData.disk === 'object' && !Array.isArray(sysData.disk)) ? sysData.disk : {};
+    const diskPaths = Object.keys(diskDataObj).sort();
+
     for (const fsPath of diskPaths) {
       const safeId = fsPath.replace(/[^a-zA-Z0-9]/g, '_');
       const canvasId = `chart-disk-${safeId}`;
       const noDataId = `nodata-disk-${safeId}`;
-      cards.push({
-        title: `磁碟使用率（${fsPath}）`,
+      diskCards.push({
+        title: `磁碟（${fsPath}）`,
         canvasId,
         noDataId,
-        data: Array.isArray(diskData[fsPath]) ? diskData[fsPath] : [],
+        data: Array.isArray(diskDataObj[fsPath]) ? diskDataObj[fsPath] : [],
         valueKey: 'used',
         yLabel: 'Used %',
         color: 'rgb(251,146,60)',
       });
     }
 
-    // If no disk data at all, show one empty disk card
     if (diskPaths.length === 0) {
-      cards.push({
-        title: '磁碟使用率（Used %）',
+      diskCards.push({
+        title: '磁碟使用率',
         canvasId: 'chart-disk-empty',
         noDataId: 'nodata-disk-empty',
         data: [],
@@ -265,20 +285,20 @@
       });
     }
 
-    // Build HTML
-    grid.innerHTML = cards.map(c => `
-      <div class="system-chart-card">
-        <h3>${c.title}</h3>
-        <div class="system-chart-wrapper">
-          <canvas id="${c.canvasId}"></canvas>
-          <div id="${c.noDataId}" class="no-data hidden">此時間範圍內無資料</div>
+    if (diskGrid) {
+      diskGrid.innerHTML = diskCards.map(c => `
+        <div class="system-chart-card">
+          <h3>${c.title}</h3>
+          <div class="system-chart-wrapper">
+            <canvas id="${c.canvasId}"></canvas>
+            <div id="${c.noDataId}" class="no-data hidden">此時間範圍內無資料</div>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `).join('');
 
-    // Render each chart
-    for (const c of cards) {
-      renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+      for (const c of diskCards) {
+        renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+      }
     }
   }
 

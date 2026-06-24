@@ -185,6 +185,12 @@ def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
 def get_system_history(ip: str, range: str) -> dict:
     """Query CPU, memory (SystemStatus) and disk (DiskStatus) history for an IP.
 
+    Data source:
+    - CPU (Load_1, Load_5, Load_15) and Memory: SystemStatus database, Status table
+    - Disk (Used per FileSystem): DiskStatus database, Status table
+
+    API endpoint: GET /api/v1/history/system?ip=...&range=...
+
     CPU loads are split into separate arrays: load_1, load_5, load_15.
     Disk data is grouped by FileSystem path into a dict keyed by file_system.
     """
@@ -197,17 +203,19 @@ def get_system_history(ip: str, range: str) -> dict:
         ip, range, start_dt.isoformat(), start_ts,
     )
 
+    # SystemStatus.Status stores historical CPU/Memory data
     _SYS_SQL = text("""
         SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
-        FROM CheckList
+        FROM Status
         WHERE IP = :ip
           AND ServerTime >= :start_dt
         ORDER BY ServerTime ASC
     """)
 
+    # DiskStatus.Status stores historical disk usage data
     _DISK_SQL = text("""
         SELECT ServerTime, FileSystem, Used
-        FROM CheckList
+        FROM Status
         WHERE IP = :ip
           AND ServerTime >= :start_dt
         ORDER BY ServerTime ASC

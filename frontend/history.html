@@ -119,8 +119,19 @@
       </div>
     </div>
 
-    <!-- 系統狀態圖（動態生成） -->
-    <div id="system-charts-grid" class="system-charts-grid"></div>
+    <!-- CPU 負載與記憶體使用率 (API: GET /api/v1/history/system?ip=...&range=...) -->
+    <!-- 資料來源：SystemStatus 資料庫 Status 表 -->
+    <div class="section">
+      <h2>CPU 負載與記憶體</h2>
+      <div id="cpu-memory-charts-grid" class="system-charts-grid"></div>
+    </div>
+
+    <!-- 磁碟使用率 (API: GET /api/v1/history/system?ip=...&range=...) -->
+    <!-- 資料來源：DiskStatus 資料庫 Status 表 -->
+    <div class="section">
+      <h2>磁碟使用率</h2>
+      <div id="disk-charts-grid" class="system-charts-grid"></div>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
