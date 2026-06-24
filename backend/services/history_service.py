@@ -121,14 +121,17 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 
 
 def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
-    """Query all tables with IP + FileType filter. Return first non-empty result."""
+    """Query all tables with IP + FileType filter. Return first non-empty result.
+    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
+    """
     for table in tables:
         sql = text(f"""
-            SELECT FileTime, DiffTime
+            SELECT FileTime, MIN(DiffTime) AS DiffTime
             FROM {table}
             WHERE IP = :ip
               AND FileType = :file_type
               AND FileTime >= :start_ts
+            GROUP BY FileTime
             ORDER BY FileTime ASC
         """)
         try:
@@ -153,13 +156,16 @@ def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
 
 
 def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
-    """Query all tables with only FileType filter (no IP). Return rows and found IP."""
+    """Query all tables with only FileType filter (no IP). Return rows and found IP.
+    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
+    """
     for table in tables:
         sql = text(f"""
-            SELECT IP, FileTime, DiffTime
+            SELECT IP, FileTime, MIN(DiffTime) AS DiffTime
             FROM {table}
             WHERE FileType = :file_type
               AND FileTime >= :start_ts
+            GROUP BY IP, FileTime
             ORDER BY FileTime ASC
         """)
         try:
