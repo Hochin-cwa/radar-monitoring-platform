@@ -148,8 +148,12 @@
   function renderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color) {
     const noDataEl = document.getElementById(noDataId);
     const canvas = document.getElementById(canvasId);
+    if (!canvas || !noDataEl) return;
 
-    if (!data || data.length === 0) {
+    // Ensure data is an array
+    const arr = Array.isArray(data) ? data : [];
+
+    if (arr.length === 0) {
       noDataEl.classList.remove('hidden');
       canvas.style.display = 'none';
       if (_chartInstances[canvasId]) { _chartInstances[canvasId].destroy(); delete _chartInstances[canvasId]; }
@@ -159,7 +163,7 @@
     noDataEl.classList.add('hidden');
     canvas.style.display = '';
 
-    const points = data.map(d => ({ x: d.time, y: d[valueKey] }));
+    const points = arr.map(d => ({ x: d.time, y: d[valueKey] }));
     const dataset = {
       label: yLabel,
       data: points,
@@ -191,6 +195,7 @@
    */
   function renderSystemCharts(sysData) {
     const grid = document.getElementById('system-charts-grid');
+    if (!grid) return;
 
     // Destroy existing chart instances before rebuilding DOM
     Object.keys(_chartInstances).forEach(id => {
@@ -211,14 +216,14 @@
 
     const cpuData = sysData.cpu || {};
     for (const cfg of cpuConfigs) {
-      const data = cpuData[cfg.key] || [];
+      const data = Array.isArray(cpuData[cfg.key]) ? cpuData[cfg.key] : [];
       const canvasId = `chart-cpu-${cfg.key}`;
       const noDataId = `nodata-cpu-${cfg.key}`;
       cards.push({ title: cfg.label, canvasId, noDataId, data, valueKey: 'value', yLabel: cfg.key, color: cfg.color });
     }
 
     // Memory card
-    const memData = sysData.memory || [];
+    const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
     cards.push({
       title: '記憶體使用率（MemoryUSE %）',
       canvasId: 'chart-memory',
@@ -230,7 +235,7 @@
     });
 
     // Disk cards — one per FileSystem path
-    const diskData = sysData.disk || {};
+    const diskData = (sysData.disk && typeof sysData.disk === 'object') ? sysData.disk : {};
     const diskPaths = Object.keys(diskData).sort();
     for (const fsPath of diskPaths) {
       const safeId = fsPath.replace(/[^a-zA-Z0-9]/g, '_');
@@ -240,7 +245,7 @@
         title: `磁碟使用率（${fsPath}）`,
         canvasId,
         noDataId,
-        data: diskData[fsPath],
+        data: Array.isArray(diskData[fsPath]) ? diskData[fsPath] : [],
         valueKey: 'used',
         yLabel: 'Used %',
         color: 'rgb(251,146,60)',
