@@ -4,6 +4,7 @@ History service — queries instrument and system history from MySQL databases.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,6 +16,49 @@ from backend.database import get_session
 from backend.services.alert_service import get_instrument_thresholds
 
 logger = logging.getLogger("history_service")
+
+
+def _extract_time_from_filename(filename: str) -> Optional[datetime]:
+    """Extract the data timestamp embedded in a FileName string.
+
+    Supports common patterns found in radar monitoring file names:
+    - YYYYMMDDHHmmss (14 digits, e.g., 2026062406214300RhoHV.vol)
+    - YYYYMMDD_HHmmss (with underscore, e.g., RCWF_20260624_061700_VOL.029.gz)
+    - w2026-06-24-19-00 (windprofiler style)
+
+    Returns a naive local-time datetime, or None if parsing fails.
+    """
+    if not filename:
+        return None
+
+    # Pattern 1: windprofiler style w2026-06-24-19-00
+    m = re.search(r'w(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})', filename)
+    if m:
+        try:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                            int(m.group(4)), int(m.group(5)), 0)
+        except ValueError:
+            pass
+
+    # Pattern 2: YYYYMMDD_HHMMSS (with underscore separator)
+    m = re.search(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})', filename)
+    if m:
+        try:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                            int(m.group(4)), int(m.group(5)), int(m.group(6)))
+        except ValueError:
+            pass
+
+    # Pattern 3: 14 consecutive digits YYYYMMDDHHmmss (most common for eclass etc.)
+    m = re.search(r'(\d{4})(0[1-9]|1[0-2])([0-2]\d|3[01])(\d{2})(\d{2})(\d{2})', filename)
+    if m:
+        try:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                            int(m.group(4)), int(m.group(5)), int(m.group(6)))
+        except ValueError:
+            pass
+
+    return None
 
 
 def _parse_range(range_str: str) -> datetime:
@@ -102,12 +146,38 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
         if row.FileTime is None:
             continue
         file_time_ts = float(row.FileTime)
-        dt = datetime.fromtimestamp(file_time_ts)
-        data.append({
-            "time": dt.isoformat(),
-            "file_time": int(file_time_ts),
-            "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
-        })
+
+        # Extract the actual data time from FileName
+        filename = row.FileName if hasattr(row, 'FileName') else None
+        extracted_dt = _extract_time_from_filename(filename) if filename else None
+
+        if extracted_dt:
+            # Use extracted time as the X axis (actual data time)
+            extracted_ts = extracted_dt.timestamp()
+            # DiffTime = FileTime (detection time) - extracted time (data time), in minutes
+            diff_minutes = (file_time_ts - extracted_ts) / 60.0
+            data.append({
+                "time": extracted_dt.isoformat(),
+                "file_time": int(extracted_ts),
+                "diff_time_minutes": max(0.0, diff_minutes),
+            })
+        else:
+            # Fallback: use DB FileTime as X axis and DB DiffTime as Y
+            dt = datetime.fromtimestamp(file_time_ts)
+            data.append({
+                "time": dt.isoformat(),
+                "file_time": int(file_time_ts),
+                "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
+            })
+
+    # Sort by time and deduplicate (same extracted time → keep smallest diff)
+    data.sort(key=lambda d: d["time"])
+    seen_times: dict[str, dict] = {}
+    for item in data:
+        t = item["time"]
+        if t not in seen_times or (item["diff_time_minutes"] or 0) < (seen_times[t]["diff_time_minutes"] or 0):
+            seen_times[t] = item
+    data = list(seen_times.values())
 
     return {
         "file_type": file_type,
@@ -122,17 +192,18 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 
 def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
     """Query all tables with IP + FileType filter. Return first non-empty result.
-    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
+    Fetches FileName to extract actual data time for DiffTime recalculation.
+    Groups by FileName to avoid duplicates (same file scanned multiple times).
     """
     for table in tables:
         sql = text(f"""
-            SELECT FileTime, MIN(DiffTime) AS DiffTime
+            SELECT FileName, MIN(FileTime) AS FileTime, MIN(DiffTime) AS DiffTime
             FROM {table}
             WHERE IP = :ip
               AND FileType = :file_type
               AND FileTime >= :start_ts
-            GROUP BY FileTime
-            ORDER BY FileTime ASC
+            GROUP BY FileName
+            ORDER BY MIN(FileTime) ASC
         """)
         try:
             with get_session("file_status") as session:
@@ -157,16 +228,16 @@ def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
 
 def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
     """Query all tables with only FileType filter (no IP). Return rows and found IP.
-    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
+    Fetches FileName to extract actual data time for DiffTime recalculation.
     """
     for table in tables:
         sql = text(f"""
-            SELECT IP, FileTime, MIN(DiffTime) AS DiffTime
+            SELECT IP, FileName, MIN(FileTime) AS FileTime, MIN(DiffTime) AS DiffTime
             FROM {table}
             WHERE FileType = :file_type
               AND FileTime >= :start_ts
-            GROUP BY IP, FileTime
-            ORDER BY FileTime ASC
+            GROUP BY IP, FileName
+            ORDER BY MIN(FileTime) ASC
         """)
         try:
             with get_session("file_status") as session:
@@ -192,13 +263,13 @@ def get_system_history(ip: str, range: str) -> dict:
     """Query CPU, memory (SystemStatus) and disk (DiskStatus) history for an IP.
 
     Data source:
-    - CPU (Load_1, Load_5, Load_15) and Memory: SystemStatus database, Status table
-    - Disk (Used per FileSystem): DiskStatus database, Status table
+    - CPU (Load_1, Load_5, Load_15) and Memory: SystemStatus database
+    - Disk (Used per FileSystem): DiskStatus database
+
+    Tries 'Status' table first (historical), falls back to 'CheckList' if no data.
+    Supports both DATETIME and UNIX_TIMESTAMP comparison for ServerTime.
 
     API endpoint: GET /api/v1/history/system?ip=...&range=...
-
-    CPU loads are split into separate arrays: load_1, load_5, load_15.
-    Disk data is grouped by FileSystem path into a dict keyed by file_system.
     """
     start_dt = _parse_range(range)
     start_ts = int(start_dt.timestamp())
@@ -209,36 +280,52 @@ def get_system_history(ip: str, range: str) -> dict:
         ip, range, start_dt.isoformat(), start_ts,
     )
 
-    # SystemStatus.Status stores historical CPU/Memory data
-    _SYS_SQL = text("""
-        SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
-        FROM Status
-        WHERE IP = :ip
-          AND ServerTime >= :start_dt
-        ORDER BY ServerTime ASC
-    """)
-
-    # DiskStatus.Status stores historical disk usage data
-    _DISK_SQL = text("""
-        SELECT ServerTime, FileSystem, Used
-        FROM Status
-        WHERE IP = :ip
-          AND ServerTime >= :start_dt
-        ORDER BY ServerTime ASC
-    """)
-
     load_1_data: list[dict] = []
     load_5_data: list[dict] = []
     load_15_data: list[dict] = []
     memory_data: list[dict] = []
 
+    # Try multiple SQL variants for system_status
+    _SYS_QUERIES = [
+        # 1. Status table with datetime comparison
+        text("""
+            SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
+            FROM Status
+            WHERE IP = :ip AND ServerTime >= :start_dt
+            ORDER BY ServerTime ASC
+        """),
+        # 2. Status table with unix timestamp comparison
+        text("""
+            SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
+            FROM Status
+            WHERE IP = :ip AND UNIX_TIMESTAMP(ServerTime) >= :start_ts
+            ORDER BY ServerTime ASC
+        """),
+        # 3. CheckList fallback (snapshot, may only have 1 row)
+        text("""
+            SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
+            FROM CheckList
+            WHERE IP = :ip AND ServerTime >= :start_dt
+            ORDER BY ServerTime ASC
+        """),
+    ]
+
     try:
-        with get_session("system_status") as session:
-            rows = session.execute(
-                _SYS_SQL.execution_options(timeout=timeout),
-                {"ip": ip, "start_dt": start_dt},
-            ).fetchall()
-        logger.info("get_system_history (system_status): got %d rows for ip=%s", len(rows), ip)
+        rows = []
+        for i, sql in enumerate(_SYS_QUERIES):
+            try:
+                with get_session("system_status") as session:
+                    params = {"ip": ip, "start_dt": start_dt, "start_ts": start_ts}
+                    rows = session.execute(
+                        sql.execution_options(timeout=timeout), params
+                    ).fetchall()
+                if rows:
+                    logger.info("get_system_history (system_status): query #%d got %d rows for ip=%s", i+1, len(rows), ip)
+                    break
+            except (OperationalError, SQLAlchemyError) as exc:
+                logger.warning("get_system_history (system_status): query #%d failed: %s", i+1, exc)
+                continue
+
         for row in rows:
             if row.ServerTime is None:
                 continue
@@ -249,34 +336,56 @@ def get_system_history(ip: str, range: str) -> dict:
                 t_iso = datetime.fromtimestamp(float(t)).isoformat()
             else:
                 t_iso = str(t)
-            load_1_data.append({
-                "time": t_iso,
-                "value": float(row.Load_1) if row.Load_1 is not None else None,
-            })
-            load_5_data.append({
-                "time": t_iso,
-                "value": float(row.Load_5) if row.Load_5 is not None else None,
-            })
-            load_15_data.append({
-                "time": t_iso,
-                "value": float(row.LOAD_15) if row.LOAD_15 is not None else None,
-            })
-            memory_data.append({
-                "time": t_iso,
-                "value": float(row.MemoryUSE) if row.MemoryUSE is not None else None,
-            })
-    except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_system_history (system_status): DB error: %s", exc)
+            load_1_data.append({"time": t_iso, "value": float(row.Load_1) if row.Load_1 is not None else None})
+            load_5_data.append({"time": t_iso, "value": float(row.Load_5) if row.Load_5 is not None else None})
+            load_15_data.append({"time": t_iso, "value": float(row.LOAD_15) if row.LOAD_15 is not None else None})
+            memory_data.append({"time": t_iso, "value": float(row.MemoryUSE) if row.MemoryUSE is not None else None})
+    except Exception as exc:
+        logger.error("get_system_history (system_status): unexpected error: %s", exc)
 
     # Disk: group by FileSystem path
     disk_by_fs: dict[str, list[dict]] = {}
+
+    _DISK_QUERIES = [
+        # 1. Status table with datetime comparison
+        text("""
+            SELECT ServerTime, FileSystem, Used
+            FROM Status
+            WHERE IP = :ip AND ServerTime >= :start_dt
+            ORDER BY ServerTime ASC
+        """),
+        # 2. Status table with unix timestamp comparison
+        text("""
+            SELECT ServerTime, FileSystem, Used
+            FROM Status
+            WHERE IP = :ip AND UNIX_TIMESTAMP(ServerTime) >= :start_ts
+            ORDER BY ServerTime ASC
+        """),
+        # 3. CheckList fallback
+        text("""
+            SELECT ServerTime, FileSystem, Used
+            FROM CheckList
+            WHERE IP = :ip AND ServerTime >= :start_dt
+            ORDER BY ServerTime ASC
+        """),
+    ]
+
     try:
-        with get_session("disk_status") as session:
-            rows = session.execute(
-                _DISK_SQL.execution_options(timeout=timeout),
-                {"ip": ip, "start_dt": start_dt},
-            ).fetchall()
-        logger.info("get_system_history (disk_status): got %d rows for ip=%s", len(rows), ip)
+        rows = []
+        for i, sql in enumerate(_DISK_QUERIES):
+            try:
+                with get_session("disk_status") as session:
+                    params = {"ip": ip, "start_dt": start_dt, "start_ts": start_ts}
+                    rows = session.execute(
+                        sql.execution_options(timeout=timeout), params
+                    ).fetchall()
+                if rows:
+                    logger.info("get_system_history (disk_status): query #%d got %d rows for ip=%s", i+1, len(rows), ip)
+                    break
+            except (OperationalError, SQLAlchemyError) as exc:
+                logger.warning("get_system_history (disk_status): query #%d failed: %s", i+1, exc)
+                continue
+
         for row in rows:
             if row.ServerTime is None:
                 continue
@@ -292,8 +401,8 @@ def get_system_history(ip: str, range: str) -> dict:
                 "time": t_iso,
                 "used": float(row.Used) if row.Used is not None else None,
             })
-    except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_system_history (disk_status): DB error: %s", exc)
+    except Exception as exc:
+        logger.error("get_system_history (disk_status): unexpected error: %s", exc)
 
     return {
         "ip": ip,
