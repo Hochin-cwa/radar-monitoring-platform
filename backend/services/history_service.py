@@ -160,6 +160,14 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
             "diff_time_minutes": diff_minutes,
         })
 
+    # 每個 FileTime（約每 6~9 分鐘一個）保留一筆（最小 DiffTime）
+    seen: dict[int, dict] = {}
+    for item in data:
+        ft = item["file_time"]
+        if ft not in seen or (item["diff_time_minutes"] or 0) < (seen[ft]["diff_time_minutes"] or 0):
+            seen[ft] = item
+    data = sorted(seen.values(), key=lambda d: d["file_time"])
+
     return {
         "file_type": file_type,
         "ip": actual_ip,
