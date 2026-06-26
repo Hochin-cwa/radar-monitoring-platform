@@ -109,6 +109,9 @@ def _table_for_file_type(file_type: str) -> str:
 def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     """Query instrument DiffTime history from status tables.
 
+    X axis: FROM_UNIXTIME(FileTime) — FileTime 轉為本地時間
+    Y axis: DiffTime / 60 — DB 原始 DiffTime（秒）轉分鐘
+
     Tries the best-guess table first; if no data is found, queries remaining
     tables until data is found. If no data found with the given IP, retries
     without the IP filter to find data under any IP for that FileType.
@@ -146,38 +149,24 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
         if row.FileTime is None:
             continue
         file_time_ts = float(row.FileTime)
+        # X 軸：FROM_UNIXTIME(FileTime) — 直接用 FileTime 轉本地時間
+        file_time_dt = datetime.fromtimestamp(file_time_ts)
+        # Y 軸：DB DiffTime（秒）÷ 60 = 分鐘
+        diff_minutes = float(row.DiffTime) / 60.0 if row.DiffTime is not None else None
 
-        # Extract the actual data time from FileName
-        filename = row.FileName if hasattr(row, 'FileName') else None
-        extracted_dt = _extract_time_from_filename(filename) if filename else None
+        data.append({
+            "time": file_time_dt.isoformat(),
+            "file_time": int(file_time_ts),
+            "diff_time_minutes": diff_minutes,
+        })
 
-        if extracted_dt:
-            # Use extracted time as the X axis (actual data time)
-            extracted_ts = extracted_dt.timestamp()
-            # DiffTime = FileTime (detection time) - extracted time (data time), in minutes
-            diff_minutes = (file_time_ts - extracted_ts) / 60.0
-            data.append({
-                "time": extracted_dt.isoformat(),
-                "file_time": int(extracted_ts),
-                "diff_time_minutes": max(0.0, diff_minutes),
-            })
-        else:
-            # Fallback: use DB FileTime as X axis and DB DiffTime as Y
-            dt = datetime.fromtimestamp(file_time_ts)
-            data.append({
-                "time": dt.isoformat(),
-                "file_time": int(file_time_ts),
-                "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
-            })
-
-    # Sort by time and deduplicate (same extracted time → keep smallest diff)
-    data.sort(key=lambda d: d["time"])
+    # 依 FileTime 去重：同一個 FileTime 只保留最小 DiffTime
     seen_times: dict[str, dict] = {}
     for item in data:
         t = item["time"]
         if t not in seen_times or (item["diff_time_minutes"] or 0) < (seen_times[t]["diff_time_minutes"] or 0):
             seen_times[t] = item
-    data = list(seen_times.values())
+    data = sorted(seen_times.values(), key=lambda d: d["time"])
 
     return {
         "file_type": file_type,
@@ -192,18 +181,17 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 
 def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
     """Query all tables with IP + FileType filter. Return first non-empty result.
-    Fetches FileName to extract actual data time for DiffTime recalculation.
-    Groups by FileName to avoid duplicates (same file scanned multiple times).
+    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
     """
     for table in tables:
         sql = text(f"""
-            SELECT FileName, MIN(FileTime) AS FileTime, MIN(DiffTime) AS DiffTime
+            SELECT FileTime, MIN(DiffTime) AS DiffTime
             FROM {table}
             WHERE IP = :ip
               AND FileType = :file_type
               AND FileTime >= :start_ts
-            GROUP BY FileName
-            ORDER BY MIN(FileTime) ASC
+            GROUP BY FileTime
+            ORDER BY FileTime ASC
         """)
         try:
             with get_session("file_status") as session:
@@ -228,16 +216,16 @@ def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
 
 def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
     """Query all tables with only FileType filter (no IP). Return rows and found IP.
-    Fetches FileName to extract actual data time for DiffTime recalculation.
+    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
     """
     for table in tables:
         sql = text(f"""
-            SELECT IP, FileName, MIN(FileTime) AS FileTime, MIN(DiffTime) AS DiffTime
+            SELECT IP, FileTime, MIN(DiffTime) AS DiffTime
             FROM {table}
             WHERE FileType = :file_type
               AND FileTime >= :start_ts
-            GROUP BY IP, FileName
-            ORDER BY MIN(FileTime) ASC
+            GROUP BY IP, FileTime
+            ORDER BY FileTime ASC
         """)
         try:
             with get_session("file_status") as session:
