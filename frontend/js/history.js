@@ -22,7 +22,7 @@
   document.getElementById('header-filetype').textContent = FILE_TYPE || '--';
 
   // ── 狀態 ──────────────────────────────────────────────────
-  let _currentRange = '1d';
+  let _currentRange = '6h';
 
   // ── Chart 實例 ────────────────────────────────────────────
   let _diffChart = null;
@@ -212,9 +212,9 @@
     const cpuMemCards = [];
 
     const cpuConfigs = [
-      { key: 'load_1', label: 'CPU 負載（Load_1）', color: 'rgb(74,222,128)' },
-      { key: 'load_5', label: 'CPU 負載（Load_5）', color: 'rgb(52,211,153)' },
-      { key: 'load_15', label: 'CPU 負載（Load_15）', color: 'rgb(16,185,129)' },
+      { key: 'load_1', label: 'CPU 負載 1m（Load_1）', color: 'rgb(74,222,128)' },
+      { key: 'load_5', label: 'CPU 負載 5m（Load_5）', color: 'rgb(52,211,153)' },
+      { key: 'load_15', label: 'CPU 負載 15m（Load_15）', color: 'rgb(16,185,129)' },
     ];
 
     const cpuData = sysData.cpu || {};
@@ -263,7 +263,7 @@
       const canvasId = `chart-disk-${safeId}`;
       const noDataId = `nodata-disk-${safeId}`;
       diskCards.push({
-        title: `磁碟（${fsPath}）`,
+        title: `磁碟 ${fsPath}（Used %）`,
         canvasId,
         noDataId,
         data: Array.isArray(diskDataObj[fsPath]) ? diskDataObj[fsPath] : [],

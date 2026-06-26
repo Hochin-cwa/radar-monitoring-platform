@@ -255,11 +255,13 @@ def get_system_history(ip: str, range: str) -> dict:
     """
     start_dt = _parse_range(range)
     start_ts = int(start_dt.timestamp())
+    # 格式化為 MySQL DATETIME 字串，確保比較不會因型別問題失敗
+    start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     timeout = get_config().system.query_timeout_seconds
 
     logger.info(
-        "get_system_history: ip=%s, range=%s, start_dt=%s, start_ts=%d",
-        ip, range, start_dt.isoformat(), start_ts,
+        "get_system_history: ip=%s, range=%s, start_str=%s",
+        ip, range, start_str,
     )
 
     load_1_data: list[dict] = []
@@ -267,27 +269,18 @@ def get_system_history(ip: str, range: str) -> dict:
     load_15_data: list[dict] = []
     memory_data: list[dict] = []
 
-    # Try multiple SQL variants for system_status
+    # SystemStatus: query Status table, fallback to CheckList
     _SYS_QUERIES = [
-        # 1. Status table with datetime comparison
         text("""
             SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
             FROM Status
-            WHERE IP = :ip AND ServerTime >= :start_dt
+            WHERE IP = :ip AND ServerTime >= :start_str
             ORDER BY ServerTime ASC
         """),
-        # 2. Status table with unix timestamp comparison
-        text("""
-            SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
-            FROM Status
-            WHERE IP = :ip AND UNIX_TIMESTAMP(ServerTime) >= :start_ts
-            ORDER BY ServerTime ASC
-        """),
-        # 3. CheckList fallback (snapshot, may only have 1 row)
         text("""
             SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
             FROM CheckList
-            WHERE IP = :ip AND ServerTime >= :start_dt
+            WHERE IP = :ip AND ServerTime >= :start_str
             ORDER BY ServerTime ASC
         """),
     ]
@@ -297,9 +290,9 @@ def get_system_history(ip: str, range: str) -> dict:
         for i, sql in enumerate(_SYS_QUERIES):
             try:
                 with get_session("system_status") as session:
-                    params = {"ip": ip, "start_dt": start_dt, "start_ts": start_ts}
                     rows = session.execute(
-                        sql.execution_options(timeout=timeout), params
+                        sql.execution_options(timeout=timeout),
+                        {"ip": ip, "start_str": start_str},
                     ).fetchall()
                 if rows:
                     logger.info("get_system_history (system_status): query #%d got %d rows for ip=%s", i+1, len(rows), ip)
@@ -329,25 +322,16 @@ def get_system_history(ip: str, range: str) -> dict:
     disk_by_fs: dict[str, list[dict]] = {}
 
     _DISK_QUERIES = [
-        # 1. Status table with datetime comparison
         text("""
             SELECT ServerTime, FileSystem, Used
             FROM Status
-            WHERE IP = :ip AND ServerTime >= :start_dt
+            WHERE IP = :ip AND ServerTime >= :start_str
             ORDER BY ServerTime ASC
         """),
-        # 2. Status table with unix timestamp comparison
-        text("""
-            SELECT ServerTime, FileSystem, Used
-            FROM Status
-            WHERE IP = :ip AND UNIX_TIMESTAMP(ServerTime) >= :start_ts
-            ORDER BY ServerTime ASC
-        """),
-        # 3. CheckList fallback
         text("""
             SELECT ServerTime, FileSystem, Used
             FROM CheckList
-            WHERE IP = :ip AND ServerTime >= :start_dt
+            WHERE IP = :ip AND ServerTime >= :start_str
             ORDER BY ServerTime ASC
         """),
     ]
@@ -357,9 +341,9 @@ def get_system_history(ip: str, range: str) -> dict:
         for i, sql in enumerate(_DISK_QUERIES):
             try:
                 with get_session("disk_status") as session:
-                    params = {"ip": ip, "start_dt": start_dt, "start_ts": start_ts}
                     rows = session.execute(
-                        sql.execution_options(timeout=timeout), params
+                        sql.execution_options(timeout=timeout),
+                        {"ip": ip, "start_str": start_str},
                     ).fetchall()
                 if rows:
                     logger.info("get_system_history (disk_status): query #%d got %d rows for ip=%s", i+1, len(rows), ip)
