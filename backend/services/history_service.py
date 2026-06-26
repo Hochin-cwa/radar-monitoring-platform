@@ -160,14 +160,6 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
             "diff_time_minutes": diff_minutes,
         })
 
-    # 依 FileTime 去重：同一個 FileTime 只保留最小 DiffTime
-    seen_times: dict[str, dict] = {}
-    for item in data:
-        t = item["time"]
-        if t not in seen_times or (item["diff_time_minutes"] or 0) < (seen_times[t]["diff_time_minutes"] or 0):
-            seen_times[t] = item
-    data = sorted(seen_times.values(), key=lambda d: d["time"])
-
     return {
         "file_type": file_type,
         "ip": actual_ip,
@@ -180,17 +172,14 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 
 
 def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
-    """Query all tables with IP + FileType filter. Return first non-empty result.
-    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
-    """
+    """Query all tables with IP + FileType filter. Return first non-empty result."""
     for table in tables:
         sql = text(f"""
-            SELECT FileTime, MIN(DiffTime) AS DiffTime
+            SELECT FileTime, DiffTime
             FROM {table}
             WHERE IP = :ip
               AND FileType = :file_type
               AND FileTime >= :start_ts
-            GROUP BY FileTime
             ORDER BY FileTime ASC
         """)
         try:
@@ -215,16 +204,13 @@ def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
 
 
 def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
-    """Query all tables with only FileType filter (no IP). Return rows and found IP.
-    Groups by FileTime and takes MIN(DiffTime) to avoid duplicate points.
-    """
+    """Query all tables with only FileType filter (no IP). Return rows and found IP."""
     for table in tables:
         sql = text(f"""
-            SELECT IP, FileTime, MIN(DiffTime) AS DiffTime
+            SELECT IP, FileTime, DiffTime
             FROM {table}
             WHERE FileType = :file_type
               AND FileTime >= :start_ts
-            GROUP BY IP, FileTime
             ORDER BY FileTime ASC
         """)
         try:
