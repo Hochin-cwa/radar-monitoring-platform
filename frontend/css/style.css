@@ -1,6 +1,10 @@
 /* ── Reset & base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  font-size: 16px; /* base for 1920x1080 */
+}
+
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   background: #0f1117;
@@ -8,7 +12,95 @@ body {
   min-height: 100vh;
 }
 
-/* ── Header ── */
+/* ── Page layout ── */
+body.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ── Header (頁首) ── */
+.site-header {
+  background: #1a1d27;
+  border-bottom: 1px solid #2d3148;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.site-header h1 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #7dd3fc;
+}
+
+.header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-line1 {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.header-line2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #7dd3fc;
+}
+
+/* ── Global navigation (全域導覽列) ── */
+.global-nav {
+  background: #161923;
+  border-bottom: 1px solid #2d3148;
+  padding: 0 24px;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.global-nav-link {
+  display: inline-block;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  color: #94a3b8;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.global-nav-link:hover {
+  color: #e2e8f0;
+}
+.global-nav-link.active {
+  color: #7dd3fc;
+  border-bottom-color: #7dd3fc;
+  font-weight: 600;
+}
+
+/* ── Content area (內容區塊) ── */
+.content {
+  flex: 1;
+  padding: 24px;
+}
+
+/* ── Footer (頁尾) ── */
+.site-footer {
+  background: #1a1d27;
+  border-top: 1px solid #2d3148;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* ── Legacy header (for pages not yet migrated) ── */
 header {
   background: #1a1d27;
   border-bottom: 1px solid #2d3148;
@@ -370,12 +462,96 @@ button:hover { background: #1d4ed8; }
   min-height: calc(100vh - 60px);
 }
 
+.content .nav-cards {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 200px);
+  padding: 24px;
+}
+
 .nav-cards {
   display: flex;
   gap: 24px;
   flex-wrap: wrap;
   justify-content: center;
   padding: 24px;
+}
+
+/* ── Dashboard grid (首頁面板) ── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.dash-panel {
+  background: #1a1d27;
+  border: 1px solid #2d3148;
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+
+.panel-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #7dd3fc;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #2d3148;
+  padding-bottom: 8px;
+}
+
+.panel-link {
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+.panel-link:hover { color: #7dd3fc; }
+
+/* ── Bar chart items ── */
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bar-item {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr 60px;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-label {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-track {
+  height: 22px;
+  background: #1e2235;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.bar-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .nav-card {
@@ -448,3 +624,260 @@ button:hover { background: #1d4ed8; }
 .instrument-card.level-alert-yellow { border-color: #ca8a04; background: #1c1500; }
 .instrument-card.level-alert-orange { border-color: #ea580c; background: #1c0a00; }
 .instrument-card.level-alert-red    { border-color: #ef4444; background: #1c0a0a; }
+
+/* ══════════════════════════════════════════════════════════
+   Responsive Design — 1920×1080 → 3840×2160
+   ══════════════════════════════════════════════════════════ */
+
+/* ── 4K displays (3840×2160): scale up root font & spacing ── */
+@media (min-width: 2560px) {
+  html {
+    font-size: 22px;
+  }
+
+  .site-header {
+    padding: 20px 48px;
+  }
+
+  .global-nav {
+    padding: 0 48px;
+    gap: 8px;
+  }
+
+  .global-nav-link {
+    padding: 14px 28px;
+    font-size: 0.9rem;
+  }
+
+  .content {
+    padding: 40px 48px;
+  }
+
+  .site-footer {
+    padding: 20px 48px;
+  }
+
+  /* Legacy header */
+  header {
+    padding: 20px 48px;
+  }
+
+  .status-bar {
+    margin: 16px 48px 0;
+    padding: 14px 24px;
+  }
+
+  .section {
+    margin: 28px 48px;
+    padding: 24px 28px;
+  }
+
+  .dept-filter-bar {
+    padding: 16px 48px 0;
+    gap: 12px;
+  }
+
+  .dept-btn {
+    padding: 8px 22px;
+    font-size: 0.85rem;
+  }
+
+  /* Dashboard grid */
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px;
+  }
+
+  .dash-panel {
+    padding: 24px 28px;
+  }
+
+  .bar-item {
+    grid-template-columns: minmax(160px, 280px) 1fr 80px;
+    gap: 14px;
+  }
+
+  .bar-track {
+    height: 30px;
+  }
+
+  .bar-value {
+    font-size: 1.2rem;
+  }
+
+  /* Instrument cards */
+  .group-cards {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .normal-cards-collapse {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+    padding: 0 16px 16px;
+  }
+
+  .instrument-card {
+    padding: 18px;
+  }
+
+  .instrument-card .diff-time,
+  .diff-time {
+    font-size: 1.6rem;
+  }
+
+  /* Threshold table */
+  #threshold-table th,
+  #threshold-table td {
+    padding: 12px 16px;
+  }
+
+  #threshold-table input[type="number"] {
+    width: 110px;
+    padding: 6px 10px;
+  }
+
+  /* Chart */
+  .chart-wrapper {
+    height: 400px;
+  }
+
+  /* Nav cards */
+  .nav-card {
+    width: 300px;
+    padding: 44px 48px;
+  }
+
+  .nav-card-icon {
+    font-size: 3.4rem;
+  }
+}
+
+/* ── Ultra-wide 4K full (≥3600px viewport width) ── */
+@media (min-width: 3600px) {
+  html {
+    font-size: 28px;
+  }
+
+  .site-header {
+    padding: 24px 64px;
+  }
+
+  .global-nav {
+    padding: 0 64px;
+  }
+
+  .content {
+    padding: 48px 64px;
+  }
+
+  .site-footer {
+    padding: 24px 64px;
+  }
+
+  header {
+    padding: 24px 64px;
+  }
+
+  .status-bar {
+    margin: 20px 64px 0;
+  }
+
+  .section {
+    margin: 32px 64px;
+    padding: 28px 32px;
+  }
+
+  .dept-filter-bar {
+    padding: 20px 64px 0;
+  }
+
+  .dashboard-grid {
+    gap: 36px;
+  }
+
+  .bar-item {
+    grid-template-columns: minmax(200px, 340px) 1fr 90px;
+    gap: 16px;
+  }
+
+  .bar-track {
+    height: 36px;
+  }
+
+  .bar-value {
+    font-size: 1.3rem;
+  }
+
+  .group-cards {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .normal-cards-collapse {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    padding: 0 20px 20px;
+  }
+
+  .chart-wrapper {
+    height: 480px;
+  }
+}
+
+/* ── Standard HD (1920×1080 baseline, ≤2559px) ── */
+@media (max-width: 2559px) {
+  html {
+    font-size: 16px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+  }
+}
+
+/* ── Smaller viewports / scaled browsers (≤1200px) ── */
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bar-item {
+    grid-template-columns: minmax(100px, 160px) 1fr 50px;
+    gap: 8px;
+  }
+
+  .group-cards {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .normal-cards-collapse {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .nav-cards {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .nav-card {
+    width: 100%;
+    max-width: 360px;
+  }
+
+  #threshold-table {
+    font-size: 0.78rem;
+  }
+
+  #threshold-table th,
+  #threshold-table td {
+    padding: 6px 8px;
+  }
+
+  #threshold-table input[type="number"] {
+    width: 70px;
+  }
+}
