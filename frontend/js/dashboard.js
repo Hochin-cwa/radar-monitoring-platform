@@ -23,18 +23,19 @@ function _valueColor(pct) {
 }
 
 /* ── 產生單條 bar HTML ── */
-function _renderBar(label, value, maxValue) {
+function _renderBar(label, value, maxValue, unit = '') {
   const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
   const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
   const color = _barColor(pct);
   const valColor = _valueColor(pct);
+  const unitHtml = unit ? `<span class="bar-unit">${unit}</span>` : '';
   return `
     <div class="bar-item">
       <div class="bar-label">${label}</div>
       <div class="bar-track">
         <div class="bar-fill" style="width:${pct}%;background:${color}"></div>
       </div>
-      <div class="bar-value" style="color:${valColor}">${displayVal}</div>
+      <div class="bar-value" style="color:${valColor}">${displayVal}${unitHtml}</div>
     </div>`;
 }
 
@@ -58,7 +59,7 @@ function _renderDelayTop5(instruments) {
   const maxVal = sorted[0].diff_time_minutes || 1;
   container.innerHTML = sorted.map(inst => {
     const label = `${inst.equipment_name || inst.file_type}`;
-    return _renderBar(label, inst.diff_time_minutes, maxVal);
+    return _renderBar(label, inst.diff_time_minutes, maxVal, '分鐘');
   }).join('');
 }
 
