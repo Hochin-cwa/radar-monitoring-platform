@@ -520,7 +520,7 @@ button:hover { background: #1d4ed8; }
 
 .bar-item {
   display: grid;
-  grid-template-columns: minmax(120px, 200px) 1fr 60px;
+  grid-template-columns: minmax(120px, 200px) 1fr auto;
   align-items: center;
   gap: 10px;
 }
@@ -552,6 +552,7 @@ button:hover { background: #1d4ed8; }
   font-weight: 700;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .bar-unit {
