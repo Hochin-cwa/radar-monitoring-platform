@@ -58,7 +58,7 @@ function _renderDelayTop5(instruments) {
 
   const maxVal = sorted[0].diff_time_minutes || 1;
   container.innerHTML = sorted.map(inst => {
-    const label = `${inst.equipment_name || inst.file_type}`;
+    const label = inst.file_type || inst.equipment_name || '--';
     return _renderBar(label, inst.diff_time_minutes, maxVal, '分鐘');
   }).join('');
 }
