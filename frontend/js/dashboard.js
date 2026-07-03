@@ -39,6 +39,31 @@ function _renderBar(label, value, maxValue, unit = '') {
     </div>`;
 }
 
+/* ── 延遲儀器專用 bar（依閾值等級上色） ── */
+function _delayBarColor(diff, inst) {
+  const red    = inst.threshold_red    ?? 30;
+  const orange = inst.threshold_orange ?? 20;
+  const yellow = inst.threshold_yellow ?? 10;
+  if (diff > red)    return { bar: '#ef4444', val: '#ef4444' };   // 紅
+  if (diff > orange) return { bar: '#fb923c', val: '#fb923c' };   // 橘
+  if (diff > yellow) return { bar: '#facc15', val: '#facc15' };   // 黃
+  return { bar: '#4ade80', val: '#4ade80' };                       // 綠（不應出現）
+}
+
+function _renderDelayBar(label, value, maxValue, inst) {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  const colors = _delayBarColor(value, inst);
+  return `
+    <div class="bar-item">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
+      </div>
+      <div class="bar-value" style="color:${colors.val}">${displayVal}<span class="bar-unit">分鐘</span></div>
+    </div>`;
+}
+
 /* ── 渲染延遲時間異常儀器（全部） ── */
 function _renderDelayAll(instruments) {
   const container = document.getElementById('top-delay');
@@ -66,7 +91,7 @@ function _renderDelayAll(instruments) {
     const ip = inst.ip || '';
     const fileType = inst.file_type || '--';
     const label = ip ? `${fileType} (${ip})` : fileType;
-    return _renderBar(label, inst.diff_time_minutes, maxVal, '分鐘');
+    return _renderDelayBar(label, inst.diff_time_minutes, maxVal, inst);
   }).join('');
 }
 
