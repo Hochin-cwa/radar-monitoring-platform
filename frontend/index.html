@@ -7,32 +7,30 @@
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body class="layout">
-  <!-- 頁首 -->
+  <!-- 頁首 + 全域導覽列（合併） -->
   <header class="site-header">
     <div class="header-title">
       <div class="header-line1">中央氣象署海氣遙測組</div>
       <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
     </div>
+    <nav class="header-nav">
+      <a href="/index.html" class="global-nav-link active">首頁</a>
+      <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
+      <a href="/computers.html" class="global-nav-link">電腦即時狀況</a>
+      <a href="/settings.html" class="global-nav-link">閾值設定</a>
+    </nav>
     <div class="time-bar">
       <span>本地時間：<span id="local-time">--</span></span>
       <span>UTC：<span id="utc-time">--</span></span>
     </div>
   </header>
 
-  <!-- 全域導覽列 -->
-  <nav class="global-nav">
-    <a href="/index.html" class="global-nav-link active">首頁</a>
-    <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
-    <a href="/computers.html" class="global-nav-link">電腦即時狀況</a>
-    <a href="/settings.html" class="global-nav-link">閾值設定</a>
-  </nav>
-
   <!-- 內容區塊 -->
   <main class="content">
     <div class="dashboard-grid">
-      <!-- 延遲時間 Top 5 -->
-      <section class="dash-panel">
-        <h2 class="panel-title">延遲時間 TOP 5 儀器</h2>
+      <!-- 延遲時間異常儀器 -->
+      <section class="dash-panel dash-panel-scroll">
+        <h2 class="panel-title">延遲時間異常儀器</h2>
         <div id="top-delay" class="bar-list">
           <p class="loading">載入中…</p>
         </div>

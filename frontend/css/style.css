@@ -55,6 +55,14 @@ body.layout {
   color: #7dd3fc;
 }
 
+/* ── Header inline nav (合併導覽列) ── */
+.header-nav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  overflow-x: auto;
+}
+
 /* ── Global navigation (全域導覽列) ── */
 .global-nav {
   background: #161923;
@@ -495,6 +503,34 @@ button:hover { background: #1d4ed8; }
   overflow: hidden;
 }
 
+.dash-panel-scroll {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-panel-scroll .bar-list {
+  overflow-y: auto;
+  max-height: 320px;
+  padding-right: 8px;
+}
+
+/* Scrollbar styling */
+.dash-panel-scroll .bar-list::-webkit-scrollbar {
+  width: 6px;
+}
+.dash-panel-scroll .bar-list::-webkit-scrollbar-track {
+  background: #1e2235;
+  border-radius: 3px;
+}
+.dash-panel-scroll .bar-list::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+.dash-panel-scroll .bar-list::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 .panel-title {
   font-size: 0.9rem;
   font-weight: 600;
@@ -700,6 +736,10 @@ button:hover { background: #1d4ed8; }
 
   .dash-panel {
     padding: 24px 28px;
+  }
+
+  .dash-panel-scroll .bar-list {
+    max-height: 480px;
   }
 
   .bar-item {

@@ -39,8 +39,8 @@ function _renderBar(label, value, maxValue, unit = '') {
     </div>`;
 }
 
-/* ── 渲染延遲 Top 5 ── */
-function _renderDelayTop5(instruments) {
+/* ── 渲染延遲時間異常儀器（全部） ── */
+function _renderDelayAll(instruments) {
   const container = document.getElementById('top-delay');
   if (!instruments || instruments.length === 0) {
     container.innerHTML = '<p class="loading">無資料</p>';
@@ -48,8 +48,13 @@ function _renderDelayTop5(instruments) {
   }
 
   // 過濾掉斷線（diff_time_minutes 為 null 或極大值 ≥14400）
-  const valid = instruments.filter(i => i.diff_time_minutes != null && i.diff_time_minutes < 14400);
-  const sorted = valid.sort((a, b) => b.diff_time_minutes - a.diff_time_minutes).slice(0, 5);
+  // 只顯示超過 threshold_yellow 的異常儀器
+  const abnormal = instruments.filter(i => {
+    if (i.diff_time_minutes == null || i.diff_time_minutes >= 14400) return false;
+    const threshold = i.threshold_yellow ?? 10;
+    return i.diff_time_minutes > threshold;
+  });
+  const sorted = abnormal.sort((a, b) => b.diff_time_minutes - a.diff_time_minutes);
 
   if (sorted.length === 0) {
     container.innerHTML = '<p class="loading">所有儀器正常</p>';
@@ -58,7 +63,9 @@ function _renderDelayTop5(instruments) {
 
   const maxVal = sorted[0].diff_time_minutes || 1;
   container.innerHTML = sorted.map(inst => {
-    const label = inst.file_type || inst.equipment_name || '--';
+    const ip = inst.ip || '';
+    const fileType = inst.file_type || '--';
+    const label = ip ? `${fileType} (${ip})` : fileType;
     return _renderBar(label, inst.diff_time_minutes, maxVal, '分鐘');
   }).join('');
 }
@@ -150,7 +157,7 @@ async function _refreshDashboard() {
       fetchCurrentStatus(),
       fetchComputerStatus(),
     ]);
-    _renderDelayTop5(statusData.instruments);
+    _renderDelayAll(statusData.instruments);
     _renderCpuTop5(computerData.items);
     _renderMemoryTop5(computerData.items);
     _renderDiskTop5(computerData.items);
