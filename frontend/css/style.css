@@ -98,6 +98,76 @@ body.layout {
   padding: 24px;
 }
 
+/* ── Page body: local-nav + main-content (內容區塊含區域導覽) ── */
+.page-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.local-nav {
+  width: 180px;
+  min-width: 180px;
+  background: #161923;
+  border-right: 1px solid #2d3148;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.local-nav-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2d3148;
+}
+
+.local-nav .dept-btn {
+  width: 100%;
+  text-align: left;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+}
+
+.local-nav-item {
+  display: block;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.local-nav-item:hover {
+  background: #2d3148;
+  color: #e2e8f0;
+}
+.local-nav-item.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.main-content .section {
+  margin: 0 0 20px;
+}
+
+.main-content .status-bar {
+  margin: 0 0 12px;
+}
+
 /* ── Footer (頁尾) ── */
 .site-footer {
   background: #1a1d27;
@@ -802,6 +872,17 @@ button:hover { background: #1d4ed8; }
   .nav-card-icon {
     font-size: 3.4rem;
   }
+
+  /* Page body layout */
+  .local-nav {
+    width: 220px;
+    min-width: 220px;
+    padding: 24px 20px;
+  }
+
+  .main-content {
+    padding: 28px 40px;
+  }
 }
 
 /* ── Ultra-wide 4K full (≥3600px viewport width) ── */
@@ -875,6 +956,27 @@ button:hover { background: #1d4ed8; }
   .chart-wrapper {
     height: 480px;
   }
+
+  /* Page body layout */
+  .local-nav {
+    width: 260px;
+    min-width: 260px;
+    padding: 28px 24px;
+  }
+
+  .main-content {
+    padding: 36px 56px;
+  }
+} (1920×1080 baseline, ≤2559px) ── */
+@media (max-width: 2559px) {
+  html {
+    font-size: 16px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+  }
 }
 
 /* ── Standard HD (1920×1080 baseline, ≤2559px) ── */
@@ -891,6 +993,32 @@ button:hover { background: #1d4ed8; }
 
 /* ── Smaller viewports / scaled browsers (≤1200px) ── */
 @media (max-width: 1200px) {
+  .page-body {
+    flex-direction: column;
+  }
+
+  .local-nav {
+    width: 100%;
+    min-width: unset;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid #2d3148;
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .local-nav-title {
+    width: 100%;
+    margin-bottom: 4px;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .main-content {
+    padding: 16px;
+  }
+
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
