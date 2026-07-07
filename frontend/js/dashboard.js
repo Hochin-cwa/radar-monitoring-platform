@@ -95,6 +95,35 @@ function _renderDelayAll(instruments) {
   }).join('');
 }
 
+/* ── CPU 負載專用 bar（依閾值等級上色） ── */
+function _cpuBarColor(computer) {
+  // 紅燈：load_15 > 80（連續 15 分鐘 > 80%）
+  // 橙燈：load_5 > 80（連續 5 分鐘 > 80%）
+  // 黃燈：load_1 > 80（連續 1 分鐘 > 80%）
+  const load1  = computer.load_1  ?? 0;
+  const load5  = computer.load_5  ?? 0;
+  const load15 = computer.load_15 ?? 0;
+
+  if (load15 > 80) return { bar: '#ef4444', val: '#ef4444' };   // 紅
+  if (load5 > 80)  return { bar: '#fb923c', val: '#fb923c' };   // 橘
+  if (load1 > 80)  return { bar: '#facc15', val: '#facc15' };   // 黃
+  return { bar: '#4ade80', val: '#4ade80' };                     // 綠
+}
+
+function _renderCpuBar(label, value, maxValue, computer) {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  const colors = _cpuBarColor(computer);
+  return `
+    <div class="bar-item">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
+      </div>
+      <div class="bar-value" style="color:${colors.val}">${displayVal}</div>
+    </div>`;
+}
+
 /* ── 渲染 CPU Top 5 ── */
 function _renderCpuTop5(computers) {
   const container = document.getElementById('top-cpu');
@@ -111,11 +140,10 @@ function _renderCpuTop5(computers) {
     return;
   }
 
-  // CPU load 1 通常可能超過 100（多核），取 top 的值當做 max
   const maxVal = Math.max(sorted[0].load_1, 100);
   container.innerHTML = sorted.map(c => {
     const label = c.ip || c.equipment_name || '--';
-    return _renderBar(label, c.load_1, maxVal);
+    return _renderCpuBar(label, c.load_1, maxVal, c);
   }).join('');
 }
 
