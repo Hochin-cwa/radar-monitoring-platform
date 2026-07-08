@@ -305,7 +305,7 @@ button:hover { background: #1d4ed8; }
   letter-spacing: 0.05em;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
 }
 
 .group-badges {
