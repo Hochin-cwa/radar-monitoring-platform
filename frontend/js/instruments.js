@@ -140,41 +140,45 @@ function _renderInstruments(instruments) {
     const normalInsts   = groupInsts.filter(_isNormal);
     const abnormalInsts = groupInsts.filter(inst => !_isNormal(inst));
     const normalCount   = normalInsts.length;
+    const abnormalCount = abnormalInsts.length;
 
     const abnormalCards = abnormalInsts.map(_makeCard).join('');
-
-    const normalSummaryId = `normal-cards-${key}`;
-    const normalSummary = normalCount > 0 ? `
-      <div class="normal-summary-box" aria-expanded="false">
-        <span class="normal-summary-icon">▶</span>
-        <span>共 ${total} 台，正常 ${normalCount} 台</span>
-      </div>
-      <div class="normal-cards-collapse" id="${normalSummaryId}">
-        ${normalInsts.map(_makeCard).join('')}
-      </div>` : '';
+    const normalCards   = normalInsts.map(_makeCard).join('');
 
     const abnormalSection = abnormalCards
       ? `<div class="group-cards">${abnormalCards}</div>`
       : '';
 
+    const normalSummaryId = `normal-cards-${key}`;
+    const normalSection = normalCount > 0 ? `
+      <div class="normal-cards-collapse" id="${normalSummaryId}">
+        ${normalCards}
+      </div>` : '';
+
     return `
       <div class="instrument-group">
         <div class="group-header">
           <span>${label}</span>
+          <div class="group-badges">
+            <span class="badge-total">${total} 總量</span>
+            <span class="badge-normal">${normalCount} 正常</span>
+            <span class="badge-abnormal">${abnormalCount} 異常</span>
+          </div>
         </div>
         ${abnormalSection}
-        ${normalSummary}
+        ${normalSection}
       </div>`;
   }).join('');
 
-  container.querySelectorAll('.normal-summary-box').forEach(box => {
-    box.addEventListener('click', () => {
-      const willExpand = !box.classList.contains('expanded');
-      box.classList.toggle('expanded', willExpand);
-      box.setAttribute('aria-expanded', String(willExpand));
-      const panel = box.nextElementSibling;
-      if (panel && panel.classList.contains('normal-cards-collapse')) {
-        panel.classList.toggle('open', willExpand);
+  // 正常卡片預設隱藏，點擊 group-header 的 badges 區域可展開
+  container.querySelectorAll('.group-header').forEach(header => {
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', () => {
+      const group = header.closest('.instrument-group');
+      const collapse = group.querySelector('.normal-cards-collapse');
+      if (collapse) {
+        const isOpen = collapse.classList.contains('open');
+        collapse.classList.toggle('open', !isOpen);
       }
     });
   });
