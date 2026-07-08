@@ -29,6 +29,9 @@ body.layout {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .site-header h1 {
