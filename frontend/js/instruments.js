@@ -99,7 +99,16 @@ function _makeCard(inst) {
 
 function _isNormal(inst) {
   const diff = inst.diff_time_minutes;
-  return diff != null && diff <= (inst.threshold_yellow ?? 10);
+  return diff != null && diff <= (inst.threshold_yellow ?? 10) && diff <= DISCONNECT_THRESHOLD_MIN;
+}
+
+function _isDisconnected(inst) {
+  const diff = inst.diff_time_minutes;
+  return diff == null || diff > DISCONNECT_THRESHOLD_MIN;
+}
+
+function _isAbnormal(inst) {
+  return !_isNormal(inst) && !_isDisconnected(inst);
 }
 
 function _renderInstruments(instruments) {
@@ -137,49 +146,57 @@ function _renderInstruments(instruments) {
     const groupInsts = groups[key];
     const total = groupInsts.length;
 
-    const normalInsts   = groupInsts.filter(_isNormal);
-    const abnormalInsts = groupInsts.filter(inst => !_isNormal(inst));
-    const normalCount   = normalInsts.length;
-    const abnormalCount = abnormalInsts.length;
+    const normalInsts       = groupInsts.filter(_isNormal);
+    const abnormalInsts     = groupInsts.filter(_isAbnormal);
+    const disconnectedInsts = groupInsts.filter(_isDisconnected);
+    const normalCount       = normalInsts.length;
+    const abnormalCount     = abnormalInsts.length;
+    const disconnectedCount = disconnectedInsts.length;
 
-    const abnormalCards = abnormalInsts.map(_makeCard).join('');
-    const normalCards   = normalInsts.map(_makeCard).join('');
-
-    const abnormalSection = abnormalCards
-      ? `<div class="group-cards">${abnormalCards}</div>`
-      : '';
-
-    const normalSummaryId = `normal-cards-${key}`;
-    const normalSection = normalCount > 0 ? `
-      <div class="normal-cards-collapse" id="${normalSummaryId}">
-        ${normalCards}
-      </div>` : '';
+    const allCards          = groupInsts.map(_makeCard).join('');
+    const normalCards       = normalInsts.map(_makeCard).join('');
+    const abnormalCards     = abnormalInsts.map(_makeCard).join('');
+    const disconnectedCards = disconnectedInsts.map(_makeCard).join('');
 
     return `
-      <div class="instrument-group">
+      <div class="instrument-group" data-dept-key="${key}">
         <div class="group-header">
           <span>${label}</span>
           <div class="group-badges">
-            <span class="badge-total">${total} 總量</span>
-            <span class="badge-normal">${normalCount} 正常</span>
-            <span class="badge-abnormal">${abnormalCount} 異常</span>
+            <button class="badge-btn badge-total" data-filter="all" data-group="${key}">${total} 總量</button>
+            <button class="badge-btn badge-normal" data-filter="normal" data-group="${key}">${normalCount} 正常</button>
+            <button class="badge-btn badge-abnormal active" data-filter="abnormal" data-group="${key}">${abnormalCount} 異常</button>
+            <button class="badge-btn badge-disconnected-btn" data-filter="disconnected" data-group="${key}">${disconnectedCount} 離線</button>
           </div>
         </div>
-        ${abnormalSection}
-        ${normalSection}
+        <div class="group-cards-container">
+          <div class="group-cards filter-all" style="display:none">${allCards || '<p class="loading">無資料</p>'}</div>
+          <div class="group-cards filter-normal" style="display:none">${normalCards || '<p class="loading">無正常儀器</p>'}</div>
+          <div class="group-cards filter-abnormal">${abnormalCards || '<p class="loading">無異常儀器</p>'}</div>
+          <div class="group-cards filter-disconnected" style="display:none">${disconnectedCards || '<p class="loading">無離線儀器</p>'}</div>
+        </div>
       </div>`;
   }).join('');
 
-  // 正常卡片預設隱藏，點擊 group-header 的 badges 區域可展開
-  container.querySelectorAll('.group-header').forEach(header => {
-    header.style.cursor = 'pointer';
-    header.addEventListener('click', () => {
-      const group = header.closest('.instrument-group');
-      const collapse = group.querySelector('.normal-cards-collapse');
-      if (collapse) {
-        const isOpen = collapse.classList.contains('open');
-        collapse.classList.toggle('open', !isOpen);
-      }
+  // Wire up badge filter buttons
+  container.querySelectorAll('.badge-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const groupKey = btn.dataset.group;
+      const filter = btn.dataset.filter;
+      const group = container.querySelector(`.instrument-group[data-dept-key="${groupKey}"]`);
+      if (!group) return;
+
+      // Update active badge
+      group.querySelectorAll('.badge-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Show/hide card sections
+      group.querySelectorAll('.group-cards').forEach(section => {
+        section.style.display = 'none';
+      });
+      const target = group.querySelector(`.filter-${filter}`);
+      if (target) target.style.display = '';
     });
   });
 }
