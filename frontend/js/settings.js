@@ -56,7 +56,20 @@ async function saveThreshold(fileType, btn) {
     msgEl.className = 'save-msg ok';
     setTimeout(() => { msgEl.textContent = ''; }, 2000);
   } catch (e) {
-    msgEl.textContent = e.status === 404 ? '找不到儀器' : '儲存失敗';
+    let errMsg = '儲存失敗';
+    if (e.status === 404) {
+      errMsg = '找不到儀器';
+    } else if (e.status === 422) {
+      errMsg = '參數驗證失敗（請確認後端已更新）';
+    } else if (e.type === 'network_error') {
+      errMsg = '網路錯誤';
+    } else if (e.type === 'timeout') {
+      errMsg = '請求逾時';
+    }
+    if (e.detail) {
+      console.error('[settings] saveThreshold error:', e.detail);
+    }
+    msgEl.textContent = errMsg;
     msgEl.className = 'save-msg err';
   } finally {
     btn.disabled = false;

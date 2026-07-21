@@ -28,6 +28,13 @@ class InstrumentIntervalSetting(BaseModel):
     interval_minutes: float = Field(gt=0.0)  # 資料週期 T，必須大於 0
 
 
+class InstrumentThresholdSetting(BaseModel):
+    """接受使用者直接設定三個閾值，反推 interval_minutes = threshold_yellow - 5。"""
+    threshold_yellow: float = Field(gt=0.0)
+    threshold_orange: float = Field(gt=0.0)
+    threshold_red: float = Field(gt=0.0)
+
+
 class CurrentStatusResponse(BaseModel):
     instruments: list[InstrumentStatus]
     calculated_at: datetime

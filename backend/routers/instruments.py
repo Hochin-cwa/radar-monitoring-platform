@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from backend.models import (
     InstrumentIntervalSetting, InstrumentListItem, InstrumentListResponse,
-    ThresholdUpdateResponse,
+    InstrumentThresholdSetting, ThresholdUpdateResponse,
 )
 from backend.services.alert_service import (
     calculate_thresholds, get_instrument_thresholds,
@@ -38,7 +38,8 @@ def get_instruments() -> InstrumentListResponse:
 
 @router.post("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
 @router.put("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
-def update_threshold(file_type: str, body: InstrumentIntervalSetting) -> ThresholdUpdateResponse:
+def update_threshold(file_type: str, body: InstrumentThresholdSetting) -> ThresholdUpdateResponse:
+    """接受前端直接設定的三個閾值，從 threshold_yellow 反推 interval_minutes = yellow - 5。"""
     # 只在 DB 可用時驗證 file_type 是否存在；DB 不可用時直接允許更新
     instruments = list_instruments()
     if instruments:
@@ -46,12 +47,14 @@ def update_threshold(file_type: str, body: InstrumentIntervalSetting) -> Thresho
         if file_type not in known:
             raise HTTPException(status_code=404, detail=f"找不到儀器: {file_type}")
 
-    set_instrument_thresholds(file_type, body.interval_minutes)
-    t_yellow, t_orange, t_red = calculate_thresholds(body.interval_minutes)
+    # 從黃色閾值反推 interval_minutes（yellow = T + 5）
+    interval_minutes = max(body.threshold_yellow - 5.0, 1.0)
+    set_instrument_thresholds(file_type, interval_minutes)
+    t_yellow, t_orange, t_red = calculate_thresholds(interval_minutes)
 
     return ThresholdUpdateResponse(
         file_type=file_type,
-        interval_minutes=body.interval_minutes,
+        interval_minutes=interval_minutes,
         threshold_yellow=t_yellow,
         threshold_orange=t_orange,
         threshold_red=t_red,
