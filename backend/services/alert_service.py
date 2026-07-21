@@ -78,6 +78,8 @@ def _load_thresholds_file() -> Tuple[float, dict[str, float]]:
     """Load thresholds.yaml.
 
     Returns (default_interval, {file_type: interval_minutes}).
+    Supports both legacy format (interval_minutes) and new format (threshold_yellow/orange/red).
+    For new format, interval_minutes is back-calculated from threshold_yellow - 5.
     Falls back to _DEFAULT_INTERVAL_MINUTES if file is missing or malformed.
     """
     if not _THRESHOLDS_PATH.exists():
@@ -93,7 +95,16 @@ def _load_thresholds_file() -> Tuple[float, dict[str, float]]:
         for ft, val in (raw.get("instruments") or {}).items():
             if val is None:
                 continue
-            result[ft] = float(val.get("interval_minutes", default_interval))
+            if isinstance(val, dict):
+                if "interval_minutes" in val:
+                    result[ft] = float(val["interval_minutes"])
+                elif "threshold_yellow" in val:
+                    # Back-calculate interval from threshold_yellow = T + 5
+                    result[ft] = max(float(val["threshold_yellow"]) - 5.0, 1.0)
+                else:
+                    result[ft] = default_interval
+            else:
+                result[ft] = float(val)
         return default_interval, result
     except Exception as exc:
         logger.warning("Failed to load thresholds.yaml: %s", exc)
@@ -103,18 +114,47 @@ def _load_thresholds_file() -> Tuple[float, dict[str, float]]:
 def _save_thresholds_file(
     default_interval: float, instruments: dict[str, float]
 ) -> None:
-    """Persist interval_minutes settings to thresholds.yaml."""
-    instruments_section = {
-        ft: {"interval_minutes": t} for ft, t in instruments.items()
-    }
+    """Persist threshold settings to thresholds.yaml.
+
+    Reads existing file first to preserve other instruments' settings,
+    then only updates the instruments present in the cache.
+    Saves in threshold_yellow/orange/red format for clarity.
+    """
+    # Load existing raw data to preserve settings of instruments not in cache
+    existing_instruments = {}
+    if _THRESHOLDS_PATH.exists():
+        try:
+            with _THRESHOLDS_PATH.open("r", encoding="utf-8") as f:
+                existing_raw = yaml.safe_load(f) or {}
+            existing_instruments = existing_raw.get("instruments", {}) or {}
+        except Exception:
+            pass
+
+    # Build new instruments section: update only keys in cache, preserve others
+    new_instruments = {}
+
+    # First, keep all existing entries that are NOT in the updated cache
+    for ft, val in existing_instruments.items():
+        if ft not in instruments:
+            new_instruments[ft] = val
+
+    # Then, write/overwrite entries from the cache with full threshold values
+    for ft, interval in instruments.items():
+        t_yellow, t_orange, t_red = calculate_thresholds(interval)
+        new_instruments[ft] = {
+            "threshold_yellow": t_yellow,
+            "threshold_orange": t_orange,
+            "threshold_red": t_red,
+        }
+
     data = {
         "defaults": {"interval_minutes": default_interval},
-        "instruments": instruments_section,
+        "instruments": dict(sorted(new_instruments.items())),
     }
     try:
         with _THRESHOLDS_PATH.open("w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
-        logger.info("thresholds.yaml saved (%d instruments)", len(instruments_section))
+        logger.info("thresholds.yaml saved (%d instruments)", len(new_instruments))
     except Exception as exc:
         logger.error("Failed to save thresholds.yaml: %s", exc)
 
