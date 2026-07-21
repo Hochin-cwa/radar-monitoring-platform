@@ -1,0 +1,55 @@
+defaults:
+  interval_minutes: 7.0
+instruments:
+  DS_gfsefs:
+    threshold_orange: 4000.0
+    threshold_red: 6000.0
+    threshold_yellow: 2000.0
+  DS_skewt:
+    threshold_orange: 4000.0
+    threshold_red: 6000.0
+    threshold_yellow: 2000.0
+  HFradar_bg00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_dj00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_dt00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_gy00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_sl00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_ya00:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  HFradar_ya01:
+    threshold_orange: 40.0
+    threshold_red: 50.0
+    threshold_yellow: 30.0
+  RCCL_asd_60:
+    threshold_orange: 70.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
+  RCCL_bufr_60:
+    threshold_orange: 70.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
+  RCDS_asd_60:
+    threshold_orange: 75.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
+  RCDS_bufr_60:
+    threshold_orange: 70.0
+    threshold_red: 80.0
+    threshold_yellow: 60.0
