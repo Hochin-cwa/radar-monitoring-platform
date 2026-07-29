@@ -7,12 +7,23 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.services.history_service import get_instrument_history, get_system_history
+from backend.services.history_service import get_instrument_history, get_system_history, get_environment_history
 
 logger = logging.getLogger("routers.history")
 router = APIRouter(tags=["history"])
 
 _VALID_RANGES = {"6h", "1d", "1w", "1m", "3m"}
+
+
+@router.get("/api/v1/history/environment")
+def environment_history(
+    ip: str = Query(..., description="溫溼度計 IP"),
+    range: str = Query("1d", description="時間範圍：6h, 1d, 1w, 1m, 3m"),
+):
+    """取得指定 IP 溫溼度計的溫度與濕度歷史記錄。"""
+    if range not in _VALID_RANGES:
+        raise HTTPException(status_code=422, detail=f"Invalid range '{range}'. Must be one of {sorted(_VALID_RANGES)}")
+    return get_environment_history(ip=ip, range=range)
 
 
 @router.get("/api/v1/history/system")

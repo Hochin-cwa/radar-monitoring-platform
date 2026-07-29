@@ -98,3 +98,13 @@ async function fetchInstrumentHistory(fileType, ip, range) {
 async function fetchSystemHistory(ip, range) {
   return apiFetch(`/history/system?ip=${encodeURIComponent(ip)}&range=${encodeURIComponent(range)}`);
 }
+
+
+/**
+ * 取得溫溼度計歷史記錄（溫度 + 濕度）
+ * @param {string} ip
+ * @param {string} range  6h | 1d | 1w | 1m | 3m
+ */
+async function fetchEnvironmentHistory(ip, range) {
+  return apiFetch(`/history/environment?ip=${encodeURIComponent(ip)}&range=${encodeURIComponent(range)}`);
+}

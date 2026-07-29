@@ -77,9 +77,15 @@ function _makeCard(inst) {
   const fileType = inst.file_type || '';
   const ip = inst.ip || '';
   const equipmentName = inst.equipment_name || '';
-  const historyUrl = '/history.html?file_type=' + encodeURIComponent(fileType) +
-                     '&ip=' + encodeURIComponent(ip) +
-                     '&name=' + encodeURIComponent(equipmentName);
+
+  // 溫溼度計使用專用歷史頁面
+  const isEnvMonitor = ip === '192.168.178.19';
+  const historyUrl = isEnvMonitor
+    ? '/environment-history.html?ip=' + encodeURIComponent(ip) +
+      '&name=' + encodeURIComponent(equipmentName || '溫溼度計')
+    : '/history.html?file_type=' + encodeURIComponent(fileType) +
+      '&ip=' + encodeURIComponent(ip) +
+      '&name=' + encodeURIComponent(equipmentName);
 
   return `
     <div class="instrument-card level-${level}"

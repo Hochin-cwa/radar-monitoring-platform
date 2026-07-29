@@ -371,3 +371,89 @@ def get_system_history(ip: str, range: str) -> dict:
         "memory": memory_data,
         "disk": disk_by_fs,
     }
+
+
+def get_environment_history(ip: str, range: str) -> dict:
+    """Query temperature and humidity history for an environment monitor.
+
+    Data source: SystemStatus database, EnvironmentStatus table.
+    Falls back to Status table if EnvironmentStatus doesn't exist.
+
+    API endpoint: GET /api/v1/history/environment?ip=...&range=...
+    """
+    start_dt = _parse_range(range)
+    start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
+    timeout = get_config().system.query_timeout_seconds
+
+    logger.info(
+        "get_environment_history: ip=%s, range=%s, start_str=%s",
+        ip, range, start_str,
+    )
+
+    temperature_data: list[dict] = []
+    humidity_data: list[dict] = []
+
+    _ENV_QUERIES = [
+        text("""
+            SELECT ServerTime, Temperature, Humidity
+            FROM EnvironmentStatus
+            WHERE IP = :ip AND ServerTime >= :start_str
+            ORDER BY ServerTime ASC
+        """),
+        text("""
+            SELECT ServerTime, Temperature, Humidity
+            FROM Status
+            WHERE IP = :ip AND ServerTime >= :start_str
+            ORDER BY ServerTime ASC
+        """),
+    ]
+
+    try:
+        rows = []
+        for i, sql in enumerate(_ENV_QUERIES):
+            try:
+                with get_session("system_status") as session:
+                    rows = session.execute(
+                        sql.execution_options(timeout=timeout),
+                        {"ip": ip, "start_str": start_str},
+                    ).fetchall()
+                if rows:
+                    logger.info(
+                        "get_environment_history: query #%d got %d rows for ip=%s",
+                        i + 1, len(rows), ip,
+                    )
+                    break
+            except (OperationalError, SQLAlchemyError) as exc:
+                logger.warning(
+                    "get_environment_history: query #%d failed: %s", i + 1, exc
+                )
+                continue
+
+        for row in rows:
+            if row.ServerTime is None:
+                continue
+            t = row.ServerTime
+            if isinstance(t, datetime):
+                t_iso = t.isoformat()
+            elif isinstance(t, (int, float)):
+                t_iso = datetime.fromtimestamp(float(t)).isoformat()
+            else:
+                t_iso = str(t)
+
+            temperature_data.append({
+                "time": t_iso,
+                "value": float(row.Temperature) if row.Temperature is not None else None,
+            })
+            humidity_data.append({
+                "time": t_iso,
+                "value": float(row.Humidity) if row.Humidity is not None else None,
+            })
+    except Exception as exc:
+        logger.error("get_environment_history: unexpected error: %s", exc)
+
+    return {
+        "ip": ip,
+        "range": range,
+        "temperature": temperature_data,
+        "humidity": humidity_data,
+    }
