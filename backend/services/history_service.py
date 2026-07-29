@@ -109,8 +109,10 @@ def _table_for_file_type(file_type: str) -> str:
 def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     """Query instrument DiffTime history from status tables.
 
-    X axis: SQL FROM_UNIXTIME(FileTime) — MySQL 直接將 UNIX timestamp 轉為本地時間
+    X axis: FileTime（UNIX timestamp）以 UTC 轉為 ISO8601（帶 +00:00 時區）
     Y axis: DiffTime / 60 — DB 原始 DiffTime（秒）轉分鐘
+
+    回傳 DB 查到的每一筆記錄，不做任何合併或去重。
 
     Tries the best-guess table first; if no data is found, queries remaining
     tables until data is found. If no data found with the given IP, retries
@@ -148,25 +150,13 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     for row in rows:
         if row.FileTime is None:
             continue
-        file_time_ts = int(row.FileTime)
-        # X 軸：使用 SQL FROM_UNIXTIME(FileTime) 回傳的本地時間
-        file_time_dt = row.FileTimeLocal
+        # X 軸：FileTime（UNIX timestamp）以 UTC 轉換
+        dt = datetime.fromtimestamp(float(row.FileTime), tz=timezone.utc)
         # Y 軸：DB DiffTime（秒）÷ 60 = 分鐘
-        diff_minutes = float(row.DiffTime) / 60.0 if row.DiffTime is not None else None
-
         data.append({
-            "time": file_time_dt.isoformat() if file_time_dt else datetime.fromtimestamp(file_time_ts).isoformat(),
-            "file_time": file_time_ts,
-            "diff_time_minutes": diff_minutes,
+            "time": dt.isoformat(),
+            "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
         })
-
-    # 每個 FileTime（約每 6~9 分鐘一個）保留一筆（最小 DiffTime）
-    seen: dict[int, dict] = {}
-    for item in data:
-        ft = item["file_time"]
-        if ft not in seen or (item["diff_time_minutes"] or 0) < (seen[ft]["diff_time_minutes"] or 0):
-            seen[ft] = item
-    data = sorted(seen.values(), key=lambda d: d["file_time"])
 
     return {
         "file_type": file_type,
@@ -183,7 +173,7 @@ def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
     """Query all tables with IP + FileType filter. Return first non-empty result."""
     for table in tables:
         sql = text(f"""
-            SELECT FROM_UNIXTIME(FileTime) AS FileTimeLocal, FileTime, DiffTime
+            SELECT FileTime, DiffTime
             FROM {table}
             WHERE IP = :ip
               AND FileType = :file_type
@@ -215,7 +205,7 @@ def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
     """Query all tables with only FileType filter (no IP). Return rows and found IP."""
     for table in tables:
         sql = text(f"""
-            SELECT IP, FROM_UNIXTIME(FileTime) AS FileTimeLocal, FileTime, DiffTime
+            SELECT IP, FileTime, DiffTime
             FROM {table}
             WHERE FileType = :file_type
               AND FileTime >= :start_ts
