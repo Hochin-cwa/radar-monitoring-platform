@@ -47,6 +47,7 @@
 
   function baseChartOptions(yLabel) {
     return {
+      normalized: true,
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
@@ -82,15 +83,42 @@
     noDataEl.classList.add('hidden');
     canvas.style.display = '';
 
-    const points = data.map(d => ({ x: d.time, y: d.diff_time_minutes }));
+    // response 每一筆 diff_time_minutes 都畫成一個資料點。
+    // 同一個 FileTime 常有多筆記錄（同一次掃描的多個檔案），
+    // x 轉成 epoch 毫秒讓 Chart.js 不必逐筆 parse 字串。
+    const points = data
+      .map(d => ({ x: new Date(d.time).getTime(), y: d.diff_time_minutes }))
+      .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+      .sort((a, b) => a.x - b.x);
 
-    // 閾值水平線：以 borderDash 虛線 dataset 實作
+    if (points.length === 0) {
+      noDataEl.classList.remove('hidden');
+      canvas.style.display = 'none';
+      if (_diffChart) { _diffChart.destroy(); _diffChart = null; }
+      return;
+    }
+
+    // y 軸以實際 diff_time_minutes 範圍為準（上下留 10% 邊界）。
+    // 否則閾值線（例如紅色 27 分）會把 7~8 分的資料壓成一條平線。
+    // 資料量可能上萬筆，用迴圈而非 Math.min(...arr) 避免超出參數上限。
+    let yMin = points[0].y;
+    let yMax = points[0].y;
+    for (const p of points) {
+      if (p.y < yMin) yMin = p.y;
+      if (p.y > yMax) yMax = p.y;
+    }
+    const pad = Math.max((yMax - yMin) * 0.1, 0.1);
+    const axisMin = Math.max(0, yMin - pad);
+    const axisMax = yMax + pad;
+
+    // 閾值水平線：以 borderDash 虛線 dataset 實作。
+    // 只有落在 y 軸範圍內的閾值才畫出來，圖例才會與實際線條一致。
     const tYellow = thresholdYellow != null ? thresholdYellow : null;
     const tOrange = thresholdOrange != null ? thresholdOrange : null;
     const tRed = thresholdRed != null ? thresholdRed : null;
 
     function thresholdDataset(value, color, label) {
-      if (value == null || points.length === 0) return null;
+      if (value == null || value < axisMin || value > axisMax) return null;
       const first = points[0].x;
       const last = points[points.length - 1].x;
       return {
@@ -111,11 +139,15 @@
         label: 'DiffTime（分鐘）',
         data: points,
         borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56,189,248,0.08)',
-        borderWidth: 1.5,
-        pointRadius: 0,
-        fill: true,
-        tension: 0.2,
+        backgroundColor: '#38bdf8',
+        borderWidth: 1,
+        // 每筆數值都畫出點；同一時間多筆時才看得出分布
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        pointBackgroundColor: '#38bdf8',
+        fill: false,
+        // 同一個 x 有多筆，平滑曲線會產生假造的擺盪，關閉
+        tension: 0,
         order: 0,
       },
     ];
@@ -132,9 +164,16 @@
       display: true,
       labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 20 },
     };
+    options.plugins.tooltip.callbacks = {
+      label: ctx => `${ctx.dataset.label}：${Number(ctx.parsed.y).toFixed(3)} 分`,
+    };
+    options.scales.x.time.tooltipFormat = 'yyyy-MM-dd HH:mm:ss';
+    options.scales.y.min = axisMin;
+    options.scales.y.max = axisMax;
 
     if (_diffChart) {
       _diffChart.data.datasets = datasets;
+      _diffChart.options = options;
       _diffChart.update('none');
     } else {
       _diffChart = new Chart(canvas, { type: 'line', data: { datasets }, options });
