@@ -376,8 +376,8 @@ def get_system_history(ip: str, range: str) -> dict:
 def get_environment_history(ip: str, range: str) -> dict:
     """Query temperature and humidity history for an environment monitor.
 
-    Data source: SystemStatus database, EnvironmentStatus table.
-    Falls back to Status table if EnvironmentStatus doesn't exist.
+    Data source: SystemStatus database, enviromentMonitor table.
+    Table columns: id, device_ip, record_time, temperature, humidity.
 
     API endpoint: GET /api/v1/history/environment?ip=...&range=...
     """
@@ -393,46 +393,28 @@ def get_environment_history(ip: str, range: str) -> dict:
     temperature_data: list[dict] = []
     humidity_data: list[dict] = []
 
-    _ENV_QUERIES = [
-        text("""
-            SELECT ServerTime, Temperature, Humidity
-            FROM EnvironmentStatus
-            WHERE IP = :ip AND ServerTime >= :start_str
-            ORDER BY ServerTime ASC
-        """),
-        text("""
-            SELECT ServerTime, Temperature, Humidity
-            FROM Status
-            WHERE IP = :ip AND ServerTime >= :start_str
-            ORDER BY ServerTime ASC
-        """),
-    ]
+    sql = text("""
+        SELECT record_time, temperature, humidity
+        FROM enviromentMonitor
+        WHERE device_ip = :ip AND record_time >= :start_str
+        ORDER BY record_time ASC
+    """)
 
     try:
-        rows = []
-        for i, sql in enumerate(_ENV_QUERIES):
-            try:
-                with get_session("system_status") as session:
-                    rows = session.execute(
-                        sql.execution_options(timeout=timeout),
-                        {"ip": ip, "start_str": start_str},
-                    ).fetchall()
-                if rows:
-                    logger.info(
-                        "get_environment_history: query #%d got %d rows for ip=%s",
-                        i + 1, len(rows), ip,
-                    )
-                    break
-            except (OperationalError, SQLAlchemyError) as exc:
-                logger.warning(
-                    "get_environment_history: query #%d failed: %s", i + 1, exc
-                )
-                continue
+        with get_session("system_status") as session:
+            rows = session.execute(
+                sql.execution_options(timeout=timeout),
+                {"ip": ip, "start_str": start_str},
+            ).fetchall()
+
+        logger.info(
+            "get_environment_history: got %d rows for ip=%s", len(rows), ip,
+        )
 
         for row in rows:
-            if row.ServerTime is None:
+            if row.record_time is None:
                 continue
-            t = row.ServerTime
+            t = row.record_time
             if isinstance(t, datetime):
                 t_iso = t.isoformat()
             elif isinstance(t, (int, float)):
@@ -442,12 +424,14 @@ def get_environment_history(ip: str, range: str) -> dict:
 
             temperature_data.append({
                 "time": t_iso,
-                "value": float(row.Temperature) if row.Temperature is not None else None,
+                "value": float(row.temperature) if row.temperature is not None else None,
             })
             humidity_data.append({
                 "time": t_iso,
-                "value": float(row.Humidity) if row.Humidity is not None else None,
+                "value": float(row.humidity) if row.humidity is not None else None,
             })
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.error("get_environment_history: DB error: %s", exc)
     except Exception as exc:
         logger.error("get_environment_history: unexpected error: %s", exc)
 

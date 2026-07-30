@@ -1,0 +1,56 @@
+/*M!999999\- enable the sandbox mode */ 
+-- MariaDB dump 10.19  Distrib 10.5.29-MariaDB, for Linux (x86_64)
+--
+-- Host: 172.17.30.122    Database: SystemStatus
+-- ------------------------------------------------------
+-- Server version	10.5.27-MariaDB
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `enviromentMonitor`
+--
+
+DROP TABLE IF EXISTS `enviromentMonitor`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `enviromentMonitor` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `device_ip` char(15) NOT NULL,
+  `record_time` datetime NOT NULL,
+  `temperature` decimal(4,1) DEFAULT NULL,
+  `humidity` decimal(4,1) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1317 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `enviromentMonitor`
+--
+-- WHERE:  1 LIMIT 10
+
+LOCK TABLES `enviromentMonitor` WRITE;
+/*!40000 ALTER TABLE `enviromentMonitor` DISABLE KEYS */;
+INSERT INTO `enviromentMonitor` VALUES (1,'192.168.178.19','2026-07-27 15:51:12',24.3,55.0),(2,'192.168.178.19','2026-07-27 16:03:01',24.1,54.3),(3,'192.168.178.19','2026-07-27 16:06:01',24.0,54.1),(4,'192.168.178.19','2026-07-27 16:09:01',23.9,54.7),(5,'192.168.178.19','2026-07-27 16:12:01',24.1,58.1),(6,'192.168.178.19','2026-07-27 16:15:01',24.3,56.1),(7,'192.168.178.19','2026-07-27 16:18:01',24.1,55.2),(8,'192.168.178.19','2026-07-27 16:21:02',23.9,54.7),(9,'192.168.178.19','2026-07-27 16:24:01',23.8,54.5),(10,'192.168.178.19','2026-07-27 16:27:01',23.8,55.5);
+/*!40000 ALTER TABLE `enviromentMonitor` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2026-07-30  9:46:34

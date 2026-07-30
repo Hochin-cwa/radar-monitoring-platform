@@ -17,16 +17,16 @@
     → 前端 (environment-history.html + Chart.js)
 ```
 
-### 資料庫表結構（預期）
+### 資料庫表結構（實際）
 
 ```sql
 -- SystemStatus 資料庫
-CREATE TABLE EnvironmentStatus (
-  ID INT AUTO_INCREMENT PRIMARY KEY,
-  IP CHAR(15) NOT NULL,
-  ServerTime DATETIME NOT NULL,
-  Temperature FLOAT,
-  Humidity FLOAT
+CREATE TABLE enviromentMonitor (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  device_ip CHAR(15) NOT NULL,
+  record_time DATETIME NOT NULL,
+  temperature DECIMAL(4,1),
+  humidity DECIMAL(4,1)
 );
 ```
 
