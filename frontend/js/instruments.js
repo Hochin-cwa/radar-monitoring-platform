@@ -84,7 +84,6 @@ function _makeCard(inst) {
   const equipmentName = inst.equipment_name || '';
 
   // 溫溼度計使用專用歷史頁面
-  const isEnvMonitor = ip === '192.168.178.19';
   const historyUrl = isEnvMonitor
     ? '/environment-history.html?ip=' + encodeURIComponent(ip) +
       '&name=' + encodeURIComponent(equipmentName || '溫溼度計')
