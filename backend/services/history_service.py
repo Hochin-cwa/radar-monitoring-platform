@@ -62,12 +62,12 @@ def _extract_time_from_filename(filename: str) -> Optional[datetime]:
 
 
 def _parse_range(range_str: str) -> datetime:
-    """Return the start datetime for the given range string.
+    """Return the start datetime (UTC) for the given range string.
 
-    Returns a naive (no timezone) datetime using the local server time,
-    to match MySQL datetime columns that store local time without timezone info.
+    Returns a timezone-aware UTC datetime. DB 的 ServerTime / record_time
+    以 UTC 儲存，用伺服器本地時間比較會在 UTC+8 主機上整批查不到資料。
     """
-    now = datetime.now()
+    now = datetime.now(tz=timezone.utc)
     mapping = {
         "6h": timedelta(hours=6),
         "1d": timedelta(days=1),
@@ -231,145 +231,105 @@ def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
     return [], ""
 
 
+def _server_time_iso(t) -> Optional[str]:
+    """Normalise a ServerTime value to an ISO8601 string with UTC offset."""
+    if t is None:
+        return None
+    if isinstance(t, datetime):
+        return t.replace(tzinfo=timezone.utc).isoformat() if t.tzinfo is None else t.isoformat()
+    if isinstance(t, (int, float)):
+        return datetime.fromtimestamp(float(t), tz=timezone.utc).isoformat()
+    return str(t)
+
+
 def get_system_history(ip: str, range: str) -> dict:
     """Query CPU, memory (SystemStatus) and disk (DiskStatus) history for an IP.
 
-    Data source:
-    - CPU (Load_1, Load_5, Load_15) and Memory: SystemStatus database
-    - Disk (Used per FileSystem): DiskStatus database
-
-    Tries 'Status' table first (historical), falls back to 'CheckList' if no data.
-    Supports both DATETIME and UNIX_TIMESTAMP comparison for ServerTime.
+    Data source（皆為 Status 歷史表，CheckList 只保留每個 IP 最新一筆，不適合畫趨勢）：
+    - CPU (Load_1, Load_5, LOAD_15) 與 Memory: SystemStatus.Status
+    - Disk (FileSystem, Used): DiskStatus.Status
 
     API endpoint: GET /api/v1/history/system?ip=...&range=...
     """
     start_dt = _parse_range(range)
-    start_ts = int(start_dt.timestamp())
-    # 格式化為 MySQL DATETIME 字串，確保比較不會因型別問題失敗
-    start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     timeout = get_config().system.query_timeout_seconds
 
     logger.info(
-        "get_system_history: ip=%s, range=%s, start_str=%s",
-        ip, range, start_str,
+        "get_system_history: ip=%s, range=%s, start_dt=%s",
+        ip, range, start_dt.isoformat(),
     )
 
-    load_1_data: list[dict] = []
-    load_5_data: list[dict] = []
-    load_15_data: list[dict] = []
+    _SYS_SQL = text("""
+        SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
+        FROM Status
+        WHERE IP = :ip
+          AND ServerTime >= :start_dt
+        ORDER BY ServerTime ASC
+    """)
+
+    _DISK_SQL = text("""
+        SELECT ServerTime, FileSystem, Used
+        FROM Status
+        WHERE IP = :ip
+          AND ServerTime >= :start_dt
+        ORDER BY ServerTime ASC
+    """)
+
+    cpu_data: list[dict] = []
     memory_data: list[dict] = []
-
-    # SystemStatus: query Status table, fallback to CheckList
-    _SYS_QUERIES = [
-        text("""
-            SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
-            FROM Status
-            WHERE IP = :ip AND ServerTime >= :start_str
-            ORDER BY ServerTime ASC
-        """),
-        text("""
-            SELECT ServerTime, Load_1, Load_5, LOAD_15, MemoryUSE
-            FROM CheckList
-            WHERE IP = :ip AND ServerTime >= :start_str
-            ORDER BY ServerTime ASC
-        """),
-    ]
+    disk_data: list[dict] = []
 
     try:
-        rows = []
-        for i, sql in enumerate(_SYS_QUERIES):
-            try:
-                with get_session("system_status") as session:
-                    rows = session.execute(
-                        sql.execution_options(timeout=timeout),
-                        {"ip": ip, "start_str": start_str},
-                    ).fetchall()
-                if rows:
-                    logger.info("get_system_history (system_status): query #%d got %d rows for ip=%s", i+1, len(rows), ip)
-                    break
-            except (OperationalError, SQLAlchemyError) as exc:
-                logger.warning("get_system_history (system_status): query #%d failed: %s", i+1, exc)
-                continue
+        with get_session("system_status") as session:
+            rows = session.execute(
+                _SYS_SQL.execution_options(timeout=timeout),
+                {"ip": ip, "start_dt": start_dt},
+            ).fetchall()
+        logger.info("get_system_history (system_status): %d rows for ip=%s", len(rows), ip)
 
         for row in rows:
-            if row.ServerTime is None:
+            t_iso = _server_time_iso(row.ServerTime)
+            if t_iso is None:
                 continue
-            t = row.ServerTime
-            if isinstance(t, datetime):
-                t_iso = t.isoformat()
-            elif isinstance(t, (int, float)):
-                t_iso = datetime.fromtimestamp(float(t)).isoformat()
-            else:
-                t_iso = str(t)
-            load_1_data.append({"time": t_iso, "value": float(row.Load_1) if row.Load_1 is not None else None})
-            load_5_data.append({"time": t_iso, "value": float(row.Load_5) if row.Load_5 is not None else None})
-            load_15_data.append({"time": t_iso, "value": float(row.LOAD_15) if row.LOAD_15 is not None else None})
-            memory_data.append({"time": t_iso, "value": float(row.MemoryUSE) if row.MemoryUSE is not None else None})
-    except Exception as exc:
-        logger.error("get_system_history (system_status): unexpected error: %s", exc)
-
-    # Disk: group by FileSystem path
-    disk_by_fs: dict[str, list[dict]] = {}
-
-    _DISK_QUERIES = [
-        text("""
-            SELECT ServerTime, FileSystem, Used
-            FROM Status
-            WHERE IP = :ip AND ServerTime >= :start_str
-            ORDER BY ServerTime ASC
-        """),
-        text("""
-            SELECT ServerTime, FileSystem, Used
-            FROM CheckList
-            WHERE IP = :ip AND ServerTime >= :start_str
-            ORDER BY ServerTime ASC
-        """),
-    ]
-
-    try:
-        rows = []
-        for i, sql in enumerate(_DISK_QUERIES):
-            try:
-                with get_session("disk_status") as session:
-                    rows = session.execute(
-                        sql.execution_options(timeout=timeout),
-                        {"ip": ip, "start_str": start_str},
-                    ).fetchall()
-                if rows:
-                    logger.info("get_system_history (disk_status): query #%d got %d rows for ip=%s", i+1, len(rows), ip)
-                    break
-            except (OperationalError, SQLAlchemyError) as exc:
-                logger.warning("get_system_history (disk_status): query #%d failed: %s", i+1, exc)
-                continue
-
-        for row in rows:
-            if row.ServerTime is None:
-                continue
-            t = row.ServerTime
-            if isinstance(t, datetime):
-                t_iso = t.isoformat()
-            elif isinstance(t, (int, float)):
-                t_iso = datetime.fromtimestamp(float(t)).isoformat()
-            else:
-                t_iso = str(t)
-            fs = row.FileSystem or "unknown"
-            disk_by_fs.setdefault(fs, []).append({
+            cpu_data.append({
                 "time": t_iso,
+                "load_1": float(row.Load_1) if row.Load_1 is not None else None,
+                "load_5": float(row.Load_5) if row.Load_5 is not None else None,
+                "load_15": float(row.LOAD_15) if row.LOAD_15 is not None else None,
+            })
+            memory_data.append({
+                "time": t_iso,
+                "memory_use": float(row.MemoryUSE) if row.MemoryUSE is not None else None,
+            })
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.error("get_system_history (system_status): DB error: %s", exc)
+
+    try:
+        with get_session("disk_status") as session:
+            rows = session.execute(
+                _DISK_SQL.execution_options(timeout=timeout),
+                {"ip": ip, "start_dt": start_dt},
+            ).fetchall()
+        logger.info("get_system_history (disk_status): %d rows for ip=%s", len(rows), ip)
+
+        for row in rows:
+            t_iso = _server_time_iso(row.ServerTime)
+            if t_iso is None:
+                continue
+            disk_data.append({
+                "time": t_iso,
+                "file_system": row.FileSystem,
                 "used": float(row.Used) if row.Used is not None else None,
             })
-    except Exception as exc:
-        logger.error("get_system_history (disk_status): unexpected error: %s", exc)
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.error("get_system_history (disk_status): DB error: %s", exc)
 
     return {
         "ip": ip,
         "range": range,
-        "cpu": {
-            "load_1": load_1_data,
-            "load_5": load_5_data,
-            "load_15": load_15_data,
-        },
+        "cpu": cpu_data,
         "memory": memory_data,
-        "disk": disk_by_fs,
+        "disk": disk_data,
     }
 
 

@@ -191,8 +191,12 @@
 
     // Ensure data is an array
     const arr = Array.isArray(data) ? data : [];
+    const points = arr
+      .map(d => ({ x: new Date(d.time).getTime(), y: d[valueKey] }))
+      .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+      .sort((a, b) => a.x - b.x);
 
-    if (arr.length === 0) {
+    if (points.length === 0) {
       noDataEl.classList.remove('hidden');
       canvas.style.display = 'none';
       if (_chartInstances[canvasId]) { _chartInstances[canvasId].destroy(); delete _chartInstances[canvasId]; }
@@ -202,7 +206,6 @@
     noDataEl.classList.add('hidden');
     canvas.style.display = '';
 
-    const points = arr.map(d => ({ x: d.time, y: d[valueKey] }));
     const dataset = {
       label: yLabel,
       data: points,
@@ -230,9 +233,9 @@
    * Dynamically build system chart cards and render charts.
    * API: GET /api/v1/history/system?ip=...&range=...
    * Response format:
-   *   cpu: { load_1: [{time, value}], load_5: [...], load_15: [...] }
-   *   memory: [{time, value}]
-   *   disk: { "/path1": [{time, used}], "/path2": [...] }
+   *   cpu:    [{time, load_1, load_5, load_15}]
+   *   memory: [{time, memory_use}]
+   *   disk:   [{time, file_system, used}]
    *
    * CPU/Memory data comes from SystemStatus DB (Status table).
    * Disk data comes from DiskStatus DB (Status table).
@@ -256,12 +259,20 @@
       { key: 'load_15', label: 'CPU 負載 15m（Load_15）', color: 'rgb(16,185,129)' },
     ];
 
-    const cpuData = sysData.cpu || {};
+    // cpu 是一個扁平陣列，每筆同時含 load_1 / load_5 / load_15
+    const cpuData = Array.isArray(sysData.cpu) ? sysData.cpu : [];
     for (const cfg of cpuConfigs) {
-      const data = Array.isArray(cpuData[cfg.key]) ? cpuData[cfg.key] : [];
       const canvasId = `chart-cpu-${cfg.key}`;
       const noDataId = `nodata-cpu-${cfg.key}`;
-      cpuMemCards.push({ title: cfg.label, canvasId, noDataId, data, valueKey: 'value', yLabel: cfg.key, color: cfg.color });
+      cpuMemCards.push({
+        title: cfg.label,
+        canvasId,
+        noDataId,
+        data: cpuData,
+        valueKey: cfg.key,
+        yLabel: cfg.key,
+        color: cfg.color,
+      });
     }
 
     // Memory card
@@ -271,7 +282,7 @@
       canvasId: 'chart-memory',
       noDataId: 'nodata-memory',
       data: memData,
-      valueKey: 'value',
+      valueKey: 'memory_use',
       yLabel: 'MemoryUSE %',
       color: 'rgb(251,191,36)',
     });
@@ -293,8 +304,13 @@
     }
 
     // ── Disk cards ──
+    // disk 是扁平陣列 [{time, file_system, used}]，在前端依掛載點分組
     const diskCards = [];
-    const diskDataObj = (sysData.disk && typeof sysData.disk === 'object' && !Array.isArray(sysData.disk)) ? sysData.disk : {};
+    const diskDataObj = {};
+    for (const d of (Array.isArray(sysData.disk) ? sysData.disk : [])) {
+      const fs = d.file_system || '(unknown)';
+      (diskDataObj[fs] = diskDataObj[fs] || []).push({ time: d.time, used: d.used });
+    }
     const diskPaths = Object.keys(diskDataObj).sort();
 
     for (const fsPath of diskPaths) {
@@ -305,7 +321,7 @@
         title: `磁碟 ${fsPath}（Used %）`,
         canvasId,
         noDataId,
-        data: Array.isArray(diskDataObj[fsPath]) ? diskDataObj[fsPath] : [],
+        data: diskDataObj[fsPath],
         valueKey: 'used',
         yLabel: 'Used %',
         color: 'rgb(251,146,60)',
@@ -381,7 +397,7 @@
       let sysData = await fetchSystemHistory(actualIp, range);
 
       // If system data is empty and actualIp differs from URL IP, try URL IP
-      const hasCpuData = sysData.cpu && (sysData.cpu.load_1 || []).length > 0;
+      const hasCpuData = Array.isArray(sysData.cpu) && sysData.cpu.length > 0;
       if (!hasCpuData && actualIp !== IP) {
         sysData = await fetchSystemHistory(IP, range);
       }
