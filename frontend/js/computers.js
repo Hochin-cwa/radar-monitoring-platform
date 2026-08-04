@@ -156,8 +156,12 @@ function _renderUnifiedCard(item) {
 
   const cardClass = worst !== 'ok' ? `instrument-card level-alert-${worst}` : 'instrument-card level-ok';
 
+  const historyUrl = '/history.html?mode=computer&ip=' + encodeURIComponent(item.ip) +
+                     '&name=' + encodeURIComponent(item.equipment_name || item.ip);
+
   return `
-      <div class="${cardClass}">
+      <div class="${cardClass}" style="cursor:pointer"
+           onclick="window.open('${historyUrl}', '_blank')">
         <div class="card-title">${item.ip}</div>
         <div class="card-name">${item.equipment_name || '--'}</div>
         <div class="metric-row">

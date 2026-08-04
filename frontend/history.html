@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>歷史資料 — 雷達監控整合平台</title>
+  <title>歷史資料 — 遙測作業系統資料傳輸監控整合平台</title>
   <link rel="stylesheet" href="/css/style.css" />
   <style>
     .history-header-info {
@@ -61,7 +61,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 16px;
-      margin: 20px 24px;
+      margin: 20px 0;
     }
 
     .system-chart-card {
@@ -85,38 +85,113 @@
       height: 200px;
     }
 
+    /* ── 三欄式佈局（mode=computer） ── */
+    .three-col-layout {
+      display: grid;
+      grid-template-columns: 200px 1fr 220px;
+      gap: 0;
+      min-height: calc(100vh - 130px);
+    }
+
+    .three-col-layout .col-left {
+      background: #12141c;
+      border-right: 1px solid #2d3148;
+      padding: 16px 12px;
+      overflow-y: auto;
+    }
+
+    .three-col-layout .col-center {
+      padding: 20px 24px;
+      overflow-y: auto;
+    }
+
+    .three-col-layout .col-right {
+      background: #12141c;
+      border-left: 1px solid #2d3148;
+      padding: 16px 12px;
+      overflow-y: auto;
+    }
+
+    .col-left h3, .col-right h3 {
+      font-size: 0.82rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    .nav-item {
+      display: block;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      color: #94a3b8;
+      font-size: 0.82rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .nav-item:hover {
+      background: #1e2235;
+      color: #e2e8f0;
+    }
+    .nav-item.active {
+      background: #2563eb22;
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    .related-card {
+      display: block;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      color: #94a3b8;
+      font-size: 0.78rem;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .related-card:hover {
+      background: #2d3148;
+      border-color: #3b4264;
+      color: #e2e8f0;
+    }
+    .related-card .rc-title {
+      font-weight: 600;
+      color: #e2e8f0;
+      font-size: 0.82rem;
+    }
+    .related-card .rc-meta {
+      color: #64748b;
+      font-size: 0.72rem;
+      margin-top: 2px;
+    }
+
+    /* ── 單欄模式（mode=instrument，原本的樣式） ── */
+    .single-col-layout {
+      padding: 0;
+    }
+
     /* Responsive for 4K */
     @media (min-width: 2560px) {
-      .chart-wrapper {
-        height: 400px;
-      }
-      .system-chart-wrapper {
-        height: 300px;
-      }
+      .chart-wrapper { height: 400px; }
+      .system-chart-wrapper { height: 300px; }
       .system-charts-grid {
         grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
         gap: 24px;
-        margin: 28px 48px;
       }
-      .system-chart-card {
-        padding: 22px 24px;
-      }
-      .range-btn {
-        padding: 8px 22px;
-        font-size: 0.85rem;
-      }
+      .three-col-layout { grid-template-columns: 240px 1fr 260px; }
     }
     @media (min-width: 3600px) {
-      .chart-wrapper {
-        height: 480px;
-      }
-      .system-chart-wrapper {
-        height: 360px;
-      }
+      .chart-wrapper { height: 480px; }
+      .system-chart-wrapper { height: 360px; }
       .system-charts-grid {
         grid-template-columns: repeat(auto-fill, minmax(560px, 1fr));
         gap: 28px;
-        margin: 32px 64px;
       }
     }
   </style>
@@ -124,23 +199,32 @@
 <body>
   <header>
     <div class="header-left">
-      <a href="/instruments.html" class="back-link">← 儀器即時狀況</a>
+      <a href="#" id="back-link" class="back-link">← 返回</a>
       <h1 id="page-title">歷史資料</h1>
     </div>
     <div class="time-bar">
       <span class="history-header-info">IP：<strong id="header-ip">--</strong></span>
-      <span class="history-header-info">FileType：<strong id="header-filetype">--</strong></span>
+      <span class="history-header-info" id="header-filetype-wrap">FileType：<strong id="header-filetype">--</strong></span>
+      <!-- 時間範圍放在 header（全域導覽列）for computer mode -->
+      <div class="range-bar" id="header-range-bar" style="display:none;">
+        <button class="range-btn active" data-range="6h">6 小時</button>
+        <button class="range-btn" data-range="1d">1 天</button>
+        <button class="range-btn" data-range="1w">1 週</button>
+        <button class="range-btn" data-range="1m">1 個月</button>
+        <button class="range-btn" data-range="3m">3 個月</button>
+      </div>
     </div>
   </header>
 
-  <main>
+  <!-- ═══ 儀器模式（預設）═══ -->
+  <main id="instrument-mode" class="single-col-layout">
     <div id="status-bar" class="status-bar hidden"></div>
 
     <!-- DiffTime 主圖 -->
     <div class="section">
       <h2>資料時間差（DiffTime）</h2>
 
-      <div class="range-bar">
+      <div class="range-bar" id="instrument-range-bar">
         <button class="range-btn active" data-range="6h">6 小時</button>
         <button class="range-btn" data-range="1d">1 天</button>
         <button class="range-btn" data-range="1w">1 週</button>
@@ -154,19 +238,48 @@
       </div>
     </div>
 
-    <!-- 系統負載與記憶體 (API: GET /api/v1/history/system?ip=...&range=...) -->
+    <!-- 系統負載與記憶體 -->
     <div class="section">
       <h2>系統負載與記憶體</h2>
       <div id="cpu-memory-charts-grid" class="system-charts-grid"></div>
     </div>
 
-    <!-- 磁碟使用率 (API: GET /api/v1/history/system?ip=...&range=...) -->
-    <!-- 資料來源：DiskStatus 資料庫 Status 表 -->
+    <!-- 磁碟使用率 -->
     <div class="section">
       <h2>磁碟使用率</h2>
       <div id="disk-charts-grid" class="system-charts-grid"></div>
     </div>
   </main>
+
+  <!-- ═══ 電腦模式（三欄式）═══ -->
+  <div id="computer-mode" class="three-col-layout" style="display:none;">
+    <!-- 左欄：區域導覽（各電腦列表） -->
+    <aside class="col-left">
+      <h3>電腦列表</h3>
+      <div id="computer-nav-list"></div>
+    </aside>
+
+    <!-- 中欄：主要內容（系統圖表） -->
+    <div class="col-center">
+      <div id="computer-status-bar" class="status-bar hidden"></div>
+      <div class="section">
+        <h2>系統負載與記憶體</h2>
+        <div id="computer-cpu-memory-grid" class="system-charts-grid"></div>
+      </div>
+      <div class="section">
+        <h2>磁碟使用率</h2>
+        <div id="computer-disk-grid" class="system-charts-grid"></div>
+      </div>
+    </div>
+
+    <!-- 右欄：關聯性導覽（同 IP 的儀器） -->
+    <aside class="col-right">
+      <h3>相關儀器</h3>
+      <div id="related-instruments-list">
+        <p class="loading" style="font-size:0.8rem;color:#64748b;">載入中…</p>
+      </div>
+    </aside>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>

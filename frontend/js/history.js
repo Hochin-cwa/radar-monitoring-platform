@@ -413,16 +413,243 @@
     }
   }
 
-  // ── 時間範圍按鈕 ──────────────────────────────────────────
-  document.querySelectorAll('.range-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      _currentRange = btn.dataset.range;
-      loadAll(_currentRange);
-    });
-  });
+  // ══════════════════════════════════════════════════════════
+  // ═══ MODE DETECTION ═══
+  // ══════════════════════════════════════════════════════════
+  const MODE = params.get('mode') || 'instrument';
 
-  // ── 初始載入 ──────────────────────────────────────────────
-  loadAll(_currentRange);
+  if (MODE === 'computer') {
+    // ── Computer mode: three-column layout ──────────────────
+    document.getElementById('instrument-mode').style.display = 'none';
+    document.getElementById('computer-mode').style.display = '';
+    document.getElementById('header-range-bar').style.display = 'flex';
+    document.getElementById('header-filetype-wrap').style.display = 'none';
+
+    document.getElementById('back-link').href = '/computers.html';
+    document.getElementById('back-link').textContent = '← 電腦即時狀況';
+    document.title = `${EQUIPMENT_NAME}（${IP}）— 電腦歷史資料`;
+    document.getElementById('page-title').textContent = `${EQUIPMENT_NAME} 電腦歷史資料`;
+
+    const _compChartInstances = {};
+
+    function compRenderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color) {
+      const noDataEl = document.getElementById(noDataId);
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || !noDataEl) return;
+
+      const arr = Array.isArray(data) ? data : [];
+      const points = arr
+        .map(d => ({ x: new Date(d.time).getTime(), y: d[valueKey] }))
+        .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+        .sort((a, b) => a.x - b.x);
+
+      if (points.length === 0) {
+        noDataEl.classList.remove('hidden');
+        canvas.style.display = 'none';
+        if (_compChartInstances[canvasId]) { _compChartInstances[canvasId].destroy(); delete _compChartInstances[canvasId]; }
+        return;
+      }
+
+      noDataEl.classList.add('hidden');
+      canvas.style.display = '';
+
+      const dataset = {
+        label: yLabel,
+        data: points,
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.2,
+      };
+
+      const options = baseChartOptions(yLabel);
+
+      if (_compChartInstances[canvasId]) {
+        _compChartInstances[canvasId].data.datasets = [dataset];
+        _compChartInstances[canvasId].options = options;
+        _compChartInstances[canvasId].update('none');
+      } else {
+        _compChartInstances[canvasId] = new Chart(canvas, {
+          type: 'line',
+          data: { datasets: [dataset] },
+          options,
+        });
+      }
+    }
+
+    function compRenderSystemCharts(sysData) {
+      const cpuMemGrid = document.getElementById('computer-cpu-memory-grid');
+      const diskGrid = document.getElementById('computer-disk-grid');
+
+      Object.keys(_compChartInstances).forEach(id => {
+        _compChartInstances[id].destroy();
+        delete _compChartInstances[id];
+      });
+
+      // CPU + Memory
+      const cpuMemCards = [];
+      const cpuConfigs = [
+        { key: 'load_1', label: 'CPU 負載 1m（Load_1）', color: 'rgb(74,222,128)' },
+        { key: 'load_5', label: 'CPU 負載 5m（Load_5）', color: 'rgb(52,211,153)' },
+        { key: 'load_15', label: 'CPU 負載 15m（Load_15）', color: 'rgb(16,185,129)' },
+      ];
+      const cpuData = Array.isArray(sysData.cpu) ? sysData.cpu : [];
+      for (const cfg of cpuConfigs) {
+        const canvasId = `comp-chart-cpu-${cfg.key}`;
+        const noDataId = `comp-nodata-cpu-${cfg.key}`;
+        cpuMemCards.push({ title: cfg.label, canvasId, noDataId, data: cpuData, valueKey: cfg.key, yLabel: cfg.key, color: cfg.color });
+      }
+      const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
+      cpuMemCards.push({ title: '記憶體使用率（MemoryUSE %）', canvasId: 'comp-chart-memory', noDataId: 'comp-nodata-memory', data: memData, valueKey: 'memory_use', yLabel: 'MemoryUSE %', color: 'rgb(251,191,36)' });
+
+      if (cpuMemGrid) {
+        cpuMemGrid.innerHTML = cpuMemCards.map(c => `
+          <div class="system-chart-card">
+            <h3>${c.title}</h3>
+            <div class="system-chart-wrapper">
+              <canvas id="${c.canvasId}"></canvas>
+              <div id="${c.noDataId}" class="no-data hidden">此時間範圍內無資料</div>
+            </div>
+          </div>
+        `).join('');
+        for (const c of cpuMemCards) compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+      }
+
+      // Disk
+      const diskCards = [];
+      const diskDataObj = {};
+      for (const d of (Array.isArray(sysData.disk) ? sysData.disk : [])) {
+        const fs = d.file_system || '(unknown)';
+        (diskDataObj[fs] = diskDataObj[fs] || []).push({ time: d.time, used: d.used });
+      }
+      const diskPaths = Object.keys(diskDataObj).sort();
+      for (const fsPath of diskPaths) {
+        const safeId = fsPath.replace(/[^a-zA-Z0-9]/g, '_');
+        diskCards.push({ title: `磁碟 ${fsPath}（Used %）`, canvasId: `comp-chart-disk-${safeId}`, noDataId: `comp-nodata-disk-${safeId}`, data: diskDataObj[fsPath], valueKey: 'used', yLabel: 'Used %', color: 'rgb(251,146,60)' });
+      }
+      if (diskPaths.length === 0) {
+        diskCards.push({ title: '磁碟使用率', canvasId: 'comp-chart-disk-empty', noDataId: 'comp-nodata-disk-empty', data: [], valueKey: 'used', yLabel: 'Used %', color: 'rgb(251,146,60)' });
+      }
+      if (diskGrid) {
+        diskGrid.innerHTML = diskCards.map(c => `
+          <div class="system-chart-card">
+            <h3>${c.title}</h3>
+            <div class="system-chart-wrapper">
+              <canvas id="${c.canvasId}"></canvas>
+              <div id="${c.noDataId}" class="no-data hidden">此時間範圍內無資料</div>
+            </div>
+          </div>
+        `).join('');
+        for (const c of diskCards) compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+      }
+    }
+
+    // ── 左欄：載入電腦列表 ─────────────────────────────────
+    async function loadComputerNav() {
+      try {
+        const data = await fetchComputerStatus();
+        const items = data.items || [];
+        const navList = document.getElementById('computer-nav-list');
+        // 依科別分組
+        const groups = {};
+        for (const item of items) {
+          const dept = item.department || 'other';
+          (groups[dept] = groups[dept] || []).push(item);
+        }
+        const DEPT_LABELS = { sos: '衛星作業科', dqcs: '品管科', rsa: '應用科', wrs: '氣象雷達科', mrs: '海象雷達科' };
+        const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
+        const orderedKeys = [...DEPT_ORDER.filter(k => groups[k]), ...Object.keys(groups).filter(k => !DEPT_ORDER.includes(k))];
+
+        let html = '';
+        for (const key of orderedKeys) {
+          const label = DEPT_LABELS[key] || key;
+          html += `<div style="margin-top:10px;margin-bottom:4px;font-size:0.72rem;color:#64748b;font-weight:600;">${label}</div>`;
+          for (const item of groups[key]) {
+            const isActive = item.ip === IP;
+            html += `<a class="nav-item${isActive ? ' active' : ''}" href="/history.html?mode=computer&ip=${encodeURIComponent(item.ip)}&name=${encodeURIComponent(item.equipment_name || item.ip)}">${item.equipment_name || item.ip}</a>`;
+          }
+        }
+        navList.innerHTML = html;
+      } catch (e) {
+        document.getElementById('computer-nav-list').innerHTML = '<p style="color:#64748b;font-size:0.78rem;">無法載入</p>';
+      }
+    }
+
+    // ── 右欄：載入同 IP 的儀器 ────────────────────────────
+    async function loadRelatedInstruments() {
+      try {
+        const data = await fetchCurrentStatus();
+        const instruments = data.instruments || [];
+        const related = instruments.filter(i => i.ip === IP);
+        const list = document.getElementById('related-instruments-list');
+
+        if (related.length === 0) {
+          list.innerHTML = '<p style="color:#64748b;font-size:0.78rem;">此 IP 無相關儀器</p>';
+          return;
+        }
+
+        list.innerHTML = related.map(inst => {
+          const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
+                      '&ip=' + encodeURIComponent(inst.ip || '') +
+                      '&name=' + encodeURIComponent(inst.equipment_name || '');
+          return `<a class="related-card" href="${url}" target="_blank">
+            <div class="rc-title">${inst.file_type || '--'}</div>
+            <div class="rc-meta">${inst.equipment_name || '--'}</div>
+          </a>`;
+        }).join('');
+      } catch (e) {
+        document.getElementById('related-instruments-list').innerHTML = '<p style="color:#64748b;font-size:0.78rem;">無法載入</p>';
+      }
+    }
+
+    // ── 電腦模式資料載入 ──────────────────────────────────
+    async function loadComputerData(range) {
+      if (!IP) return;
+      const bar = document.getElementById('computer-status-bar');
+      bar.className = 'status-bar hidden';
+
+      try {
+        const sysData = await fetchSystemHistory(IP, range);
+        compRenderSystemCharts(sysData);
+      } catch (err) {
+        bar.textContent = err.type === 'timeout' ? '請求逾時' : `載入失敗：${err.message}`;
+        bar.className = 'status-bar error';
+      }
+    }
+
+    // ── 時間範圍按鈕（header） ────────────────────────────
+    document.querySelectorAll('#header-range-bar .range-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#header-range-bar .range-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _currentRange = btn.dataset.range;
+        loadComputerData(_currentRange);
+      });
+    });
+
+    // ── 初始化 ───────────────────────────────────────────
+    loadComputerNav();
+    loadRelatedInstruments();
+    loadComputerData(_currentRange);
+
+  } else {
+    // ── Instrument mode (default) ──────────────────────────
+    document.getElementById('back-link').href = '/instruments.html';
+    document.getElementById('back-link').textContent = '← 儀器即時狀況';
+
+    // 時間範圍按鈕（儀器模式內部）
+    document.querySelectorAll('#instrument-range-bar .range-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#instrument-range-bar .range-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _currentRange = btn.dataset.range;
+        loadAll(_currentRange);
+      });
+    });
+
+    // 初始載入
+    loadAll(_currentRange);
+  }
 })();
