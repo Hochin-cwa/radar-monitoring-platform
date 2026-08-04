@@ -616,7 +616,7 @@
           const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
                       '&ip=' + encodeURIComponent(inst.ip || '') +
                       '&name=' + encodeURIComponent(inst.equipment_name || '');
-          return `<a class="related-card" href="${url}" target="_blank">
+          return `<a class="related-card" href="${url}">
             <div class="rc-title">${inst.file_type || '--'}</div>
             <div class="rc-meta">${inst.equipment_name || '--'}</div>
           </a>`;

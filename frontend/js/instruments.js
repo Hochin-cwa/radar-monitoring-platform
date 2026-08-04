@@ -97,7 +97,7 @@ function _makeCard(inst) {
          data-file-type="${fileType}"
          data-ip="${ip}"
          data-equipment-name="${equipmentName}"
-         onclick="window.open('${historyUrl}', '_blank')">
+         onclick="window.location.href='${historyUrl}'">
       <div class="card-meta">${inst.ip || '--'}</div>
       <div class="card-title">${inst.file_type}</div>
       <div class="card-name">${inst.equipment_name || '--'}</div>

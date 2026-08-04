@@ -161,7 +161,7 @@ function _renderUnifiedCard(item) {
 
   return `
       <div class="${cardClass}" style="cursor:pointer"
-           onclick="window.open('${historyUrl}', '_blank')">
+           onclick="window.location.href='${historyUrl}'">
         <div class="card-title">${item.ip}</div>
         <div class="card-name">${item.equipment_name || '--'}</div>
         <div class="metric-row">
