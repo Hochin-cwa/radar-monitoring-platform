@@ -422,7 +422,7 @@
     // ── Computer mode: three-column layout ──────────────────
     document.getElementById('instrument-mode').style.display = 'none';
     document.getElementById('computer-mode').style.display = '';
-    document.getElementById('header-range-bar').style.display = 'flex';
+    document.getElementById('global-range-nav').style.display = 'flex';
     document.getElementById('header-filetype-wrap').style.display = 'none';
 
     document.getElementById('back-link').href = '/computers.html';
@@ -546,7 +546,7 @@
       }
     }
 
-    // ── 左欄：載入電腦列表 ─────────────────────────────────
+    // ── 左欄：載入電腦列表（科別按鈕展開式） ──────────────
     async function loadComputerNav() {
       try {
         const data = await fetchComputerStatus();
@@ -565,13 +565,35 @@
         let html = '';
         for (const key of orderedKeys) {
           const label = DEPT_LABELS[key] || key;
-          html += `<div style="margin-top:10px;margin-bottom:4px;font-size:0.72rem;color:#64748b;font-weight:600;">${label}</div>`;
+          const containsCurrent = groups[key].some(item => item.ip === IP);
+          html += `<button class="dept-toggle-btn${containsCurrent ? ' expanded' : ''}" data-dept-key="${key}">${label}</button>`;
+          html += `<div class="dept-computer-list${containsCurrent ? ' show' : ''}" data-dept-list="${key}">`;
           for (const item of groups[key]) {
             const isActive = item.ip === IP;
-            html += `<a class="nav-item${isActive ? ' active' : ''}" href="/history.html?mode=computer&ip=${encodeURIComponent(item.ip)}&name=${encodeURIComponent(item.equipment_name || item.ip)}">${item.equipment_name || item.ip}</a>`;
+            html += `<a class="nav-item${isActive ? ' active' : ''}" href="/history.html?mode=computer&ip=${encodeURIComponent(item.ip)}&name=${encodeURIComponent(item.equipment_name || item.ip)}">
+              <div style="font-weight:500;">${item.equipment_name || item.ip}</div>
+              <div style="font-size:0.72rem;color:#64748b;">${item.ip}</div>
+            </a>`;
           }
+          html += '</div>';
         }
         navList.innerHTML = html;
+
+        // Wire up toggle buttons
+        navList.querySelectorAll('.dept-toggle-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const key = btn.dataset.deptKey;
+            const list = navList.querySelector(`.dept-computer-list[data-dept-list="${key}"]`);
+            const isExpanded = btn.classList.contains('expanded');
+            if (isExpanded) {
+              btn.classList.remove('expanded');
+              list.classList.remove('show');
+            } else {
+              btn.classList.add('expanded');
+              list.classList.add('show');
+            }
+          });
+        });
       } catch (e) {
         document.getElementById('computer-nav-list').innerHTML = '<p style="color:#64748b;font-size:0.78rem;">無法載入</p>';
       }

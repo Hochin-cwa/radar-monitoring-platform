@@ -176,6 +176,61 @@
       padding: 0;
     }
 
+    /* ── 全域導覽列（時間範圍）── */
+    .global-range-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 24px;
+      background: #161825;
+      border-bottom: 1px solid #2d3148;
+    }
+    .global-range-label {
+      font-size: 0.82rem;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    /* ── 左欄科別按鈕 ── */
+    .dept-toggle-btn {
+      display: block;
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      border: none;
+      border-radius: 6px;
+      background: #1e2235;
+      color: #94a3b8;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .dept-toggle-btn:hover {
+      background: #2d3148;
+      color: #e2e8f0;
+    }
+    .dept-toggle-btn.expanded {
+      background: #2563eb22;
+      color: #60a5fa;
+    }
+    .dept-toggle-btn::before {
+      content: '▸ ';
+      font-size: 0.7rem;
+    }
+    .dept-toggle-btn.expanded::before {
+      content: '▾ ';
+    }
+    .dept-computer-list {
+      display: none;
+      padding-left: 8px;
+      margin-bottom: 8px;
+    }
+    .dept-computer-list.show {
+      display: block;
+    }
+
     /* Responsive for 4K */
     @media (min-width: 2560px) {
       .chart-wrapper { height: 400px; }
@@ -205,16 +260,20 @@
     <div class="time-bar">
       <span class="history-header-info">IP：<strong id="header-ip">--</strong></span>
       <span class="history-header-info" id="header-filetype-wrap">FileType：<strong id="header-filetype">--</strong></span>
-      <!-- 時間範圍放在 header（全域導覽列）for computer mode -->
-      <div class="range-bar" id="header-range-bar" style="display:none;">
-        <button class="range-btn active" data-range="6h">6 小時</button>
-        <button class="range-btn" data-range="1d">1 天</button>
-        <button class="range-btn" data-range="1w">1 週</button>
-        <button class="range-btn" data-range="1m">1 個月</button>
-        <button class="range-btn" data-range="3m">3 個月</button>
-      </div>
     </div>
   </header>
+
+  <!-- 全域導覽列：時間範圍選擇（computer mode 獨立區塊） -->
+  <nav id="global-range-nav" class="global-range-nav" style="display:none;">
+    <span class="global-range-label">時間範圍：</span>
+    <div class="range-bar" id="header-range-bar">
+      <button class="range-btn active" data-range="6h">6 小時</button>
+      <button class="range-btn" data-range="1d">1 天</button>
+      <button class="range-btn" data-range="1w">1 週</button>
+      <button class="range-btn" data-range="1m">1 個月</button>
+      <button class="range-btn" data-range="3m">3 個月</button>
+    </div>
+  </nav>
 
   <!-- ═══ 儀器模式（預設）═══ -->
   <main id="instrument-mode" class="single-col-layout">
