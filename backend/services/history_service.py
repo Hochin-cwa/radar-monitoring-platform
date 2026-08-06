@@ -150,11 +150,18 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     for row in rows:
         if row.FileTime is None:
             continue
-        # X 軸：FileTime（UNIX timestamp）→ 本地時間（與 MySQL FROM_UNIXTIME 一致）
-        dt = datetime.fromtimestamp(float(row.FileTime))
+        # X 軸：直接使用 MySQL FROM_UNIXTIME(FileTime) 回傳的 datetime
+        # 確保與 DB 伺服器的 FROM_UNIXTIME 結果完全一致
+        local_time = row.LocalTime
+        if local_time is None:
+            continue
+        if isinstance(local_time, datetime):
+            time_str = local_time.isoformat()
+        else:
+            time_str = str(local_time)
         # Y 軸：DB DiffTime（秒）÷ 60 = 分鐘
         data.append({
-            "time": dt.isoformat(),
+            "time": time_str,
             "diff_time_minutes": float(row.DiffTime) / 60.0 if row.DiffTime is not None else None,
         })
 
@@ -173,7 +180,7 @@ def _query_instrument_tables(tables, ip, file_type, start_ts, timeout):
     """Query all tables with IP + FileType filter. Return first non-empty result."""
     for table in tables:
         sql = text(f"""
-            SELECT FileTime, DiffTime
+            SELECT FROM_UNIXTIME(FileTime) AS LocalTime, FileTime, DiffTime
             FROM {table}
             WHERE IP = :ip
               AND FileType = :file_type
@@ -205,7 +212,7 @@ def _query_instrument_tables_any_ip(tables, file_type, start_ts, timeout):
     """Query all tables with only FileType filter (no IP). Return rows and found IP."""
     for table in tables:
         sql = text(f"""
-            SELECT IP, FileTime, DiffTime
+            SELECT IP, FROM_UNIXTIME(FileTime) AS LocalTime, FileTime, DiffTime
             FROM {table}
             WHERE FileType = :file_type
               AND FileTime >= :start_ts
