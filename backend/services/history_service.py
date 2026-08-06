@@ -150,8 +150,8 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     for row in rows:
         if row.FileTime is None:
             continue
-        # X 軸：FileTime（UNIX timestamp）以 UTC 轉換
-        dt = datetime.fromtimestamp(float(row.FileTime), tz=timezone.utc)
+        # X 軸：FileTime（UNIX timestamp）→ 本地時間（與 MySQL FROM_UNIXTIME 一致）
+        dt = datetime.fromtimestamp(float(row.FileTime))
         # Y 軸：DB DiffTime（秒）÷ 60 = 分鐘
         data.append({
             "time": dt.isoformat(),

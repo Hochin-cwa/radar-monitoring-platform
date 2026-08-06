@@ -83,12 +83,21 @@
     noDataEl.classList.add('hidden');
     canvas.style.display = '';
 
-    // response 每一筆 diff_time_minutes 都畫成一個資料點。
-    // 同一個 FileTime 常有多筆記錄（同一次掃描的多個檔案），
-    // x 轉成 epoch 毫秒讓 Chart.js 不必逐筆 parse 字串。
-    const points = data
+    // 同一個 FileTime（x 軸時間）有多筆 DiffTime（同一次掃描的多個檔案），
+    // 取平均值後只畫一個點，避免垂直散布。
+    const rawPoints = data
       .map(d => ({ x: new Date(d.time).getTime(), y: d.diff_time_minutes }))
-      .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+      .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+
+    // 依 x（epoch ms）分組取平均
+    const grouped = {};
+    for (const p of rawPoints) {
+      if (!grouped[p.x]) grouped[p.x] = { sum: 0, count: 0 };
+      grouped[p.x].sum += p.y;
+      grouped[p.x].count += 1;
+    }
+    const points = Object.keys(grouped)
+      .map(x => ({ x: Number(x), y: grouped[x].sum / grouped[x].count }))
       .sort((a, b) => a.x - b.x);
 
     if (points.length === 0) {
@@ -97,7 +106,6 @@
       if (_diffChart) { _diffChart.destroy(); _diffChart = null; }
       return;
     }
-
     // y 軸以實際 diff_time_minutes 範圍為準（上下留 10% 邊界）。
     // 否則閾值線（例如紅色 27 分）會把 7~8 分的資料壓成一條平線。
     // 資料量可能上萬筆，用迴圈而非 Math.min(...arr) 避免超出參數上限。
