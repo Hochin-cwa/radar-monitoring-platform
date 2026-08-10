@@ -30,6 +30,8 @@ const STATION_NAME_MAP = {
   // 風廓線雷達站
   RCCL: '風廓線雷達站 CL',
   RCDS: '風廓線雷達站 DS',
+  // 高頻雷達
+  DS: '東沙',
   // 衛星
   HIMA: '向日葵9號',
   GK2A: '千里眼2A',

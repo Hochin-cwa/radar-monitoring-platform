@@ -88,12 +88,20 @@
     }
   </style>
 </head>
-<body>
-  <header>
-    <div class="header-left">
-      <a href="/instruments.html" class="back-link">← 儀器即時狀況</a>
-      <h1 id="page-title">溫溼度計 歷史資料</h1>
+<body class="layout">
+  <!-- 頁首（含全域導覽列） -->
+  <header class="site-header">
+    <div class="header-title">
+      <div class="header-line1">中央氣象署海氣遙測組</div>
+      <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
     </div>
+    <nav class="header-nav">
+      <a href="/index.html" class="global-nav-link">首頁</a>
+      <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
+      <a href="/computers.html" class="global-nav-link">電腦即時狀況</a>
+      <a href="/settings.html" class="global-nav-link">閾值設定</a>
+      <a href="/environment-history.html?ip=192.168.178.19" class="global-nav-link active">環境監控</a>
+    </nav>
     <div class="time-bar">
       <span class="history-header-info">IP：<strong id="header-ip">--</strong></span>
       <span class="history-header-info">設備：<strong id="header-name">溫溼度計</strong></span>
