@@ -431,12 +431,15 @@
     document.getElementById('instrument-mode').style.display = 'none';
     document.getElementById('computer-mode').style.display = '';
     document.getElementById('global-range-nav').style.display = 'flex';
-    document.getElementById('header-filetype-wrap').style.display = 'none';
 
-    document.getElementById('back-link').href = '/computers.html';
-    document.getElementById('back-link').textContent = '← 電腦即時狀況';
+    // 顯示全域導覽列頁首，隱藏舊版頁首
+    document.getElementById('site-header').style.display = '';
+    document.getElementById('legacy-header').style.display = 'none';
+    document.body.classList.add('layout');
+    document.getElementById('header-ip-site').textContent = IP || '--';
+    document.getElementById('header-name-site').textContent = EQUIPMENT_NAME || '--';
+
     document.title = `${EQUIPMENT_NAME}（${IP}）— 電腦歷史資料`;
-    document.getElementById('page-title').textContent = `${EQUIPMENT_NAME} 電腦歷史資料`;
 
     const _compChartInstances = {};
 
@@ -666,6 +669,8 @@
 
   } else {
     // ── Instrument mode (default) ──────────────────────────
+    document.getElementById('site-header').style.display = 'none';
+    document.getElementById('legacy-header').style.display = '';
     document.getElementById('back-link').href = '/instruments.html';
     document.getElementById('back-link').textContent = '← 儀器即時狀況';
 

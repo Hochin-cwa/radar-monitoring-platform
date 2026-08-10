@@ -7,6 +7,43 @@
 const REFRESH_INTERVAL_MS = 60_000;
 let _refreshTimer = null;
 
+/* ── 站碼→中文名稱對照表 ── */
+const STATION_NAME_MAP = {
+  // 雷達站
+  RCHL: '花蓮',
+  RCKT: '七股',
+  RCLY: '林園',
+  RCSL: '五分山',
+  RCNT: '南屯',
+  RCCK: '清泉崗（空軍）',
+  RCGR: '桃園（空軍）',
+  RCCG: '成功（空軍）',
+  RCWF: '五分山（另）',
+  RCMD: '墾丁（radman）',
+  // 空軍基地站
+  RCAY: '空軍基地站',
+  RCKU: '空軍基地站',
+  RCNN: '空軍基地站',
+  RCPO: '空軍基地站',
+  RCQS: '空軍基地站',
+  RCYU: '空軍基地站',
+  // 風廓線雷達站
+  RCCL: '風廓線雷達站 CL',
+  RCDS: '風廓線雷達站 DS',
+  // 衛星
+  HIMA: '向日葵9號',
+  GK2A: '千里眼2A',
+};
+
+/**
+ * 從 file_type 提取站碼前綴並回傳中文名稱（若有對應）
+ */
+function _getStationChinese(fileType) {
+  if (!fileType) return '';
+  const prefix = fileType.split('_')[0];
+  return STATION_NAME_MAP[prefix] || '';
+}
+
 /* ── 色階工具 ── */
 function _barColor(pct) {
   // 0~50 綠→黃，50~80 黃→橘，80~100 橘→紅粉
@@ -90,7 +127,10 @@ function _renderDelayAll(instruments) {
   container.innerHTML = sorted.map(inst => {
     const ip = inst.ip || '';
     const fileType = inst.file_type || '--';
-    const label = ip ? `${fileType} (${ip})` : fileType;
+    const chineseName = _getStationChinese(fileType);
+    const label = chineseName
+      ? `${chineseName} ${fileType}`
+      : (ip ? `${fileType} (${ip})` : fileType);
     return _renderDelayBar(label, inst.diff_time_minutes, maxVal, inst);
   }).join('');
 }

@@ -252,7 +252,26 @@
   </style>
 </head>
 <body>
-  <header>
+  <!-- 頁首（含全域導覽列） -->
+  <header id="site-header" class="site-header" style="display:none;">
+    <div class="header-title">
+      <div class="header-line1">中央氣象署海氣遙測組</div>
+      <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
+    </div>
+    <nav class="header-nav">
+      <a href="/index.html" class="global-nav-link">首頁</a>
+      <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
+      <a href="/computers.html" class="global-nav-link active">電腦即時狀況</a>
+      <a href="/settings.html" class="global-nav-link">閾值設定</a>
+    </nav>
+    <div class="time-bar">
+      <span class="history-header-info">IP：<strong id="header-ip-site">--</strong></span>
+      <span class="history-header-info">名稱：<strong id="header-name-site">--</strong></span>
+    </div>
+  </header>
+
+  <!-- 舊版頁首（儀器模式用） -->
+  <header id="legacy-header">
     <div class="header-left">
       <a href="#" id="back-link" class="back-link">← 返回</a>
       <h1 id="page-title">歷史資料</h1>
