@@ -15,9 +15,12 @@
 
   // ── 頁面標題 ──────────────────────────────────────────────
   document.title = `${NAME}（${IP}）— 溫溼度歷史資料`;
-  document.getElementById('page-title').textContent = `${NAME} 歷史資料`;
-  document.getElementById('header-ip').textContent = IP || '--';
-  document.getElementById('header-name').textContent = NAME || '--';
+  const pageTitleEl = document.getElementById('page-title');
+  if (pageTitleEl) pageTitleEl.textContent = `${NAME} 歷史資料`;
+  const headerIpEl = document.getElementById('header-ip');
+  if (headerIpEl) headerIpEl.textContent = IP || '--';
+  const headerNameEl = document.getElementById('header-name');
+  if (headerNameEl) headerNameEl.textContent = NAME || '--';
 
   // ── 狀態 ──────────────────────────────────────────────────
   let _currentRange = '6h';
