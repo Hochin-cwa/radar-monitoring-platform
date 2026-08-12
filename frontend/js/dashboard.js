@@ -27,11 +27,18 @@ const STATION_NAME_MAP = {
   RCPO: '空軍基地站',
   RCQS: '空軍基地站',
   RCYU: '空軍基地站',
-  // 風廓線雷達站
-  RCCL: '風廓線雷達站 CL',
-  RCDS: '風廓線雷達站 DS',
+  // 剖風儀雷達站
+  RCCL: '剖風儀 CL',
+  RCDS: '剖風儀 東沙',
   // 高頻雷達
   DS: '東沙',
+  HFradar_dt00: '大潭',
+  HFradar_ya01: '永安1',
+  HFradar_ya00: '永安',
+  HFradar_bg00: '北港',
+  HFradar_sl00: '沙崙',
+  HFradar_dj00: '東莒',
+  HFradar_gy00: '觀音',
   // 衛星
   HIMA: '向日葵9號',
   GK2A: '千里眼2A',
