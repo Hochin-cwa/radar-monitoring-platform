@@ -45,10 +45,14 @@ const STATION_NAME_MAP = {
 };
 
 /**
- * 從 file_type 提取站碼前綴並回傳中文名稱（若有對應）
+ * 從 file_type 提取站碼並回傳中文名稱（若有對應）
+ * 優先以完整 file_type 匹配，再以 _ 前綴匹配
  */
 function _getStationChinese(fileType) {
   if (!fileType) return '';
+  // 完整匹配（如 HFradar_dt00）
+  if (STATION_NAME_MAP[fileType]) return STATION_NAME_MAP[fileType];
+  // 前綴匹配（如 RCHL_rb5_CS → RCHL）
   const prefix = fileType.split('_')[0];
   return STATION_NAME_MAP[prefix] || '';
 }
