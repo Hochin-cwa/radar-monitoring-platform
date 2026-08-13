@@ -14,9 +14,8 @@ const DEPT_LABELS = {
   rsa:  '應用科',
   wrs:  '氣象雷達科',
   mrs:  '海象雷達科',
-  'Server Room': '環境監控',
 };
-const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa', 'Server Room'];
+const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
 
 function _pad(n) { return String(n).padStart(2, '0'); }
 function _formatDatetime(d) {
@@ -53,16 +52,12 @@ function _alertClass(diff, inst) {
 
 function _makeCard(inst) {
   const diff = inst.diff_time_minutes;
-  const isEnvMonitor = inst.ip === '192.168.178.19' && inst.file_type === 'enviromentMonitor';
-  const level = isEnvMonitor ? 'ok' : _alertClass(diff, inst);
+  const level = _alertClass(diff, inst);
   const isDisconnected = level === 'disconnected';
   const isAlert = level !== 'ok' && !isDisconnected;
 
   let diffDisplay, statusBadge;
-  if (isEnvMonitor) {
-    diffDisplay = '<span class="diff-time diff-ok">環境感測器</span>';
-    statusBadge = '<span class="ok-label">✓ 運作中</span>';
-  } else if (isDisconnected) {
+  if (isDisconnected) {
     diffDisplay = '<span class="diff-disconnected">斷線</span>';
     statusBadge = '<span class="badge-disconnected">⚠ 斷線</span>';
   } else {
@@ -83,13 +78,9 @@ function _makeCard(inst) {
   const ip = inst.ip || '';
   const equipmentName = inst.equipment_name || '';
 
-  // 溫溼度計使用專用歷史頁面
-  const historyUrl = isEnvMonitor
-    ? '/environment-history.html?ip=' + encodeURIComponent(ip) +
-      '&name=' + encodeURIComponent(equipmentName || '溫溼度計')
-    : '/history.html?file_type=' + encodeURIComponent(fileType) +
-      '&ip=' + encodeURIComponent(ip) +
-      '&name=' + encodeURIComponent(equipmentName);
+  const historyUrl = '/history.html?file_type=' + encodeURIComponent(fileType) +
+    '&ip=' + encodeURIComponent(ip) +
+    '&name=' + encodeURIComponent(equipmentName);
 
   return `
     <div class="instrument-card level-${level}"
@@ -109,14 +100,11 @@ function _makeCard(inst) {
 
 function _isNormal(inst) {
   const diff = inst.diff_time_minutes;
-  // 溫溼度計視為永遠正常（環境監控類別）
-  if (inst.ip === '192.168.178.19' && inst.file_type === 'enviromentMonitor') return true;
   return diff != null && diff <= (inst.threshold_yellow ?? 10) && diff <= DISCONNECT_THRESHOLD_MIN;
 }
 
 function _isDisconnected(inst) {
   const diff = inst.diff_time_minutes;
-  if (inst.ip === '192.168.178.19' && inst.file_type === 'enviromentMonitor') return false;
   return diff == null || diff > DISCONNECT_THRESHOLD_MIN;
 }
 
@@ -136,24 +124,12 @@ function _renderInstruments(instruments) {
     return;
   }
 
-  // 注入溫溼度計（環境監控）靜態卡片，確保不重複
-  const ENV_MONITOR_IP = '192.168.178.19';
-  const hasEnvMonitor = source.some(i => i.ip === ENV_MONITOR_IP);
-  const augmented = hasEnvMonitor ? source : [...source, {
-    file_type: 'enviromentMonitor',
-    equipment_name: '溫溼度計',
-    ip: ENV_MONITOR_IP,
-    department: 'Server Room',
-    diff_time_minutes: null,
-    threshold_yellow: 9999,
-    threshold_orange: 9999,
-    threshold_red: 9999,
-    latest_file_time: null,
-  }];
+  // 過濾掉 Server Room（環境監控）的儀器，已移至獨立頁面
+  const filtered_source = source.filter(i => (i.department || '').toLowerCase() !== 'server room');
 
   const filtered = _activeDept === 'all'
-    ? augmented
-    : augmented.filter(i => (i.department || '').toLowerCase() === _activeDept.toLowerCase());
+    ? filtered_source
+    : filtered_source.filter(i => (i.department || '').toLowerCase() === _activeDept.toLowerCase());
 
   if (filtered.length === 0) {
     container.innerHTML = '<p class="loading">此科別目前無儀器資料</p>';
