@@ -137,7 +137,21 @@ function _renderDelayAll(instruments) {
   }
 
   const maxVal = sorted[0].diff_time_minutes || 1;
-  container.innerHTML = sorted.map(inst => {
+
+  // 相同中文名稱只顯示延遲最大的一筆
+  const seen = new Set();
+  const deduped = [];
+  for (const inst of sorted) {
+    const fileType = inst.file_type || '--';
+    const chineseName = _getStationChinese(fileType);
+    const key = chineseName || `${fileType}_${inst.ip || ''}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(inst);
+    }
+  }
+
+  container.innerHTML = deduped.map(inst => {
     const ip = inst.ip || '';
     const fileType = inst.file_type || '--';
     const chineseName = _getStationChinese(fileType);
