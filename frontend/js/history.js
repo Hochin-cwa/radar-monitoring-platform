@@ -610,7 +610,7 @@
       }
     }
 
-    // ── 右欄：載入同 IP 的儀器 ────────────────────────────
+    // ── 右欄：載入同 IP 的儀器（卡片含狀態燈號） ────────
     async function loadRelatedInstruments() {
       try {
         const data = await fetchCurrentStatus();
@@ -624,12 +624,44 @@
         }
 
         list.innerHTML = related.map(inst => {
+          const diff = inst.diff_time_minutes;
+          const threshold_yellow = inst.threshold_yellow ?? 10;
+          const threshold_orange = inst.threshold_orange ?? 15;
+          const threshold_red = inst.threshold_red ?? 20;
+
+          let level, diffText, badgeText;
+          if (diff == null || diff >= 14400) {
+            level = 'disconnected';
+            diffText = '斷線';
+            badgeText = '⚠ 斷線';
+          } else if (diff > threshold_red) {
+            level = 'red';
+            diffText = diff.toFixed(1) + ' 分鐘';
+            badgeText = '⚠ 異常';
+          } else if (diff > threshold_orange) {
+            level = 'orange';
+            diffText = diff.toFixed(1) + ' 分鐘';
+            badgeText = '⚠ 異常';
+          } else if (diff > threshold_yellow) {
+            level = 'yellow';
+            diffText = diff.toFixed(1) + ' 分鐘';
+            badgeText = '⚠ 異常';
+          } else {
+            level = 'ok';
+            diffText = diff.toFixed(1) + ' 分鐘';
+            badgeText = '✓ 正常';
+          }
+
           const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
                       '&ip=' + encodeURIComponent(inst.ip || '') +
                       '&name=' + encodeURIComponent(inst.equipment_name || '');
-          return `<a class="related-card" href="${url}">
-            <div class="rc-title">${inst.file_type || '--'}</div>
-            <div class="rc-meta">${inst.equipment_name || '--'}</div>
+
+          return `<a class="related-inst-card" href="${url}">
+            <div class="ri-ip">${inst.ip || '--'}</div>
+            <div class="ri-filetype">${inst.file_type || '--'}</div>
+            <div class="ri-name">${inst.equipment_name || '--'}</div>
+            <div class="ri-diff ri-${level}">${diffText}</div>
+            <span class="ri-badge ri-badge-${level}">${badgeText}</span>
           </a>`;
         }).join('');
       } catch (e) {
