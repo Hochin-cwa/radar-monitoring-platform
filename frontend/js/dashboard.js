@@ -55,6 +55,7 @@ function _getStationChinese(fileType) {
   // 前綴匹配（如 RCHL_rb5_CS → RCHL）
   const prefix = fileType.split('_')[0];
   return STATION_NAME_MAP[prefix] || '';
+  
 }
 
 /* ── 色階工具 ── */

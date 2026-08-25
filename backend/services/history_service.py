@@ -92,7 +92,13 @@ def _table_for_file_type(file_type: str) -> str:
         return "HFradarStatus"
     if "satellite" in ft or "SAT" in ft:
         return "satelliteStatus"
+    # HIMA_* (Himawari) / GK2A_* (GEO-KOMPSAT-2A) are satellite file types
+    if ft.startswith("HIMA_") or ft.startswith("GK2A_"):
+        return "satelliteStatus"
     if "windprofiler" in ft or "WP" in ft:
+        return "windprofilerStatus"
+    # RCCL_* / RCDS_* are windprofiler file types (清流/東石風乃計)
+    if ft.startswith("RCCL_") or ft.startswith("RCDS_"):
         return "windprofilerStatus"
     return "radarStatus"
 
