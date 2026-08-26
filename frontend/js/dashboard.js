@@ -21,12 +21,12 @@ const STATION_NAME_MAP = {
   RCWF: '五分山（另）',
   RCMD: '墾丁（radman）',
   // 空軍基地站
-  RCAY: '空軍基地站',
-  RCKU: '空軍基地站',
-  RCNN: '空軍基地站',
-  RCPO: '空軍基地站',
-  RCQS: '空軍基地站',
-  RCYU: '空軍基地站',
+  RCAY: '岡山（空軍）',
+  RCKU: '嘉義（空軍）',
+  RCNN: '台南（空軍）',
+  RCPO: '新竹（空軍）',
+  RCQS: '台東（空軍）',
+  RCYU: '花蓮（空軍）',
   // 剖風儀雷達站
   RCCL: '剖風儀 CL',
   RCDS: '剖風儀 東沙',
