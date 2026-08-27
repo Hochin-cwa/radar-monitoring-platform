@@ -26,8 +26,8 @@ logger = logging.getLogger("alert_service")
 
 _THRESHOLDS_PATH = Path(__file__).parent.parent.parent / "config" / "thresholds.yaml"
 _thresholds_lock = threading.Lock()
-# Cache maps file_type -> interval_minutes (float)
-_thresholds_cache: dict[str, float] | None = None
+# Cache maps file_type -> interval_minutes (float) OR dict with direct thresholds
+_thresholds_cache: dict[str, float | dict[str, float]] | None = None
 _default_interval: float | None = None
 
 _DEFAULT_INTERVAL_MINUTES = 7.0
@@ -77,12 +77,10 @@ def calculate_thresholds(interval_minutes: float) -> Tuple[float, float, float]:
     )
 
 
-def _load_thresholds_file() -> Tuple[float, dict[str, float]]:
+def _load_thresholds_file() -> Tuple[float, dict[str, float | dict[str, float]]]:
     """Load thresholds.yaml.
 
-    Returns (default_interval, {file_type: interval_minutes}).
-    Supports both legacy format (interval_minutes) and new format (threshold_yellow/orange/red).
-    For new format, interval_minutes is back-calculated from threshold_yellow - 5.
+    Returns (default_interval, {file_type: interval_minutes | {threshold_yellow, threshold_orange, threshold_red}}).
     Falls back to _DEFAULT_INTERVAL_MINUTES if file is missing or malformed.
     """
     if not _THRESHOLDS_PATH.exists():
@@ -94,19 +92,22 @@ def _load_thresholds_file() -> Tuple[float, dict[str, float]]:
         default_interval = float(
             file_defaults.get("interval_minutes", _DEFAULT_INTERVAL_MINUTES)
         )
-        result: dict[str, float] = {}
+        result: dict[str, float | dict[str, float]] = {}
         for ft, val in (raw.get("instruments") or {}).items():
             if val is None:
                 continue
+            # Direct thresholds format (preferred): store the three values as a dict.
             if isinstance(val, dict):
-                if "interval_minutes" in val:
-                    result[ft] = float(val["interval_minutes"])
-                elif "threshold_yellow" in val:
-                    # Back-calculate interval from threshold_yellow = T + 5
-                    result[ft] = max(float(val["threshold_yellow"]) - 5.0, 1.0)
+                if "threshold_yellow" in val:
+                    result[ft] = {
+                        "threshold_yellow": float(val["threshold_yellow"]),
+                        "threshold_orange": float(val["threshold_orange"]),
+                        "threshold_red": float(val["threshold_red"]),
+                    }
                 else:
-                    result[ft] = default_interval
+                    result[ft] = float(val.get("interval_minutes", default_interval))
             else:
+                # Legacy bare-float entry: treat as interval_minutes.
                 result[ft] = float(val)
         return default_interval, result
     except Exception as exc:
@@ -115,49 +116,31 @@ def _load_thresholds_file() -> Tuple[float, dict[str, float]]:
 
 
 def _save_thresholds_file(
-    default_interval: float, instruments: dict[str, float]
+    default_interval: float, instruments: dict[str, float | dict[str, float]]
 ) -> None:
     """Persist threshold settings to thresholds.yaml.
 
-    Reads existing file first to preserve other instruments' settings,
-    then only updates the instruments present in the cache.
-    Saves in threshold_yellow/orange/red format for clarity.
+    Direct-threshold entries are written as threshold_yellow/orange/red;
+    legacy bare-float entries are written as interval_minutes.
     """
-    # Load existing raw data to preserve settings of instruments not in cache
-    existing_instruments = {}
-    if _THRESHOLDS_PATH.exists():
-        try:
-            with _THRESHOLDS_PATH.open("r", encoding="utf-8") as f:
-                existing_raw = yaml.safe_load(f) or {}
-            existing_instruments = existing_raw.get("instruments", {}) or {}
-        except Exception:
-            pass
-
-    # Build new instruments section: update only keys in cache, preserve others
-    new_instruments = {}
-
-    # First, keep all existing entries that are NOT in the updated cache
-    for ft, val in existing_instruments.items():
-        if ft not in instruments:
-            new_instruments[ft] = val
-
-    # Then, write/overwrite entries from the cache with full threshold values
-    for ft, interval in instruments.items():
-        t_yellow, t_orange, t_red = calculate_thresholds(interval)
-        new_instruments[ft] = {
-            "threshold_yellow": t_yellow,
-            "threshold_orange": t_orange,
-            "threshold_red": t_red,
-        }
-
+    instruments_section: dict[str, dict[str, float]] = {}
+    for ft, val in instruments.items():
+        if isinstance(val, dict):
+            instruments_section[ft] = {
+                "threshold_yellow": val["threshold_yellow"],
+                "threshold_orange": val["threshold_orange"],
+                "threshold_red": val["threshold_red"],
+            }
+        else:
+            instruments_section[ft] = {"interval_minutes": val}
     data = {
         "defaults": {"interval_minutes": default_interval},
-        "instruments": dict(sorted(new_instruments.items())),
+        "instruments": dict(sorted(instruments_section.items())),
     }
     try:
         with _THRESHOLDS_PATH.open("w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
-        logger.info("thresholds.yaml saved (%d instruments)", len(new_instruments))
+        logger.info("thresholds.yaml saved (%d instruments)", len(instruments_section))
     except Exception as exc:
         logger.error("Failed to save thresholds.yaml: %s", exc)
 
@@ -197,7 +180,29 @@ def _get_interval(file_type: str) -> float:
     """Return interval_minutes for a given file_type, falling back to defaults."""
     with _thresholds_lock:
         _ensure_loaded()
-        return _thresholds_cache.get(file_type, _default_interval)  # type: ignore[return-value]
+        val = _thresholds_cache.get(file_type)  # type: ignore[union-attr]
+        if val is None:
+            return _default_interval  # type: ignore[return-value]
+        if isinstance(val, dict):
+            # Direct thresholds stored; use yellow as approximate interval
+            return val["threshold_yellow"]
+        return val
+
+
+def _get_thresholds(file_type: str) -> Tuple[float, float, float]:
+    """Return (yellow, orange, red) thresholds for a file_type.
+
+    If direct thresholds are stored, return them.
+    Otherwise, calculate from interval_minutes.
+    """
+    with _thresholds_lock:
+        _ensure_loaded()
+        val = _thresholds_cache.get(file_type)  # type: ignore[union-attr]
+        if val is None:
+            return calculate_thresholds(_default_interval)  # type: ignore[arg-type]
+        if isinstance(val, dict):
+            return (val["threshold_yellow"], val["threshold_orange"], val["threshold_red"])
+        return calculate_thresholds(val)
 
 
 def _load_ip_department_map() -> dict[str, str]:
@@ -236,7 +241,7 @@ def get_all_instrument_statuses() -> list[InstrumentStatus]:
     for row in rows:
         file_type: str = row.FileType
         interval = _get_interval(file_type)
-        t_yellow, t_orange, t_red = calculate_thresholds(interval)
+        t_yellow, t_orange, t_red = _get_thresholds(file_type)
         department = ip_dept.get(row.IP or "", "") or None
 
         # 找不到對應科別的儀器不顯示
@@ -285,7 +290,7 @@ def get_all_instrument_statuses() -> list[InstrumentStatus]:
 
 def get_instrument_thresholds(file_type: str) -> Tuple[float, float, float]:
     """Return (yellow, orange, red) thresholds for a file_type."""
-    return calculate_thresholds(_get_interval(file_type))
+    return _get_thresholds(file_type)
 
 
 def set_instrument_thresholds(file_type: str, interval_minutes: float) -> None:
@@ -305,6 +310,34 @@ def set_instrument_thresholds(file_type: str, interval_minutes: float) -> None:
     logger.info(
         "Thresholds updated: %s -> T=%.1f (yellow=%.1f orange=%.1f red=%.1f)",
         file_type, interval_minutes, t_yellow, t_orange, t_red,
+    )
+
+
+def set_instrument_thresholds_direct(
+    file_type: str,
+    threshold_yellow: float,
+    threshold_orange: float,
+    threshold_red: float,
+) -> None:
+    """Persist direct threshold values for a specific instrument."""
+    global _status_cache, _status_cache_time
+    if threshold_yellow <= 0 or threshold_orange <= 0 or threshold_red <= 0:
+        raise ValueError("All thresholds must be > 0")
+    with _thresholds_lock:
+        _ensure_loaded()
+        _thresholds_cache[file_type] = {  # type: ignore[index]
+            "threshold_yellow": threshold_yellow,
+            "threshold_orange": threshold_orange,
+            "threshold_red": threshold_red,
+        }
+        _save_thresholds_file(_default_interval, _thresholds_cache)  # type: ignore[arg-type]
+    # Invalidate status cache so next request uses updated thresholds
+    with _status_cache_lock:
+        _status_cache = None
+        _status_cache_time = 0.0
+    logger.info(
+        "Thresholds updated (direct): %s -> yellow=%.1f orange=%.1f red=%.1f",
+        file_type, threshold_yellow, threshold_orange, threshold_red,
     )
 
 
@@ -328,7 +361,7 @@ def list_instruments() -> list[dict]:
             "interval_minutes": _get_interval(row.FileType),
             **dict(zip(
                 ("threshold_yellow", "threshold_orange", "threshold_red"),
-                calculate_thresholds(_get_interval(row.FileType)),
+                _get_thresholds(row.FileType),
             )),
         }
         for row in rows

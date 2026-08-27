@@ -46,7 +46,7 @@ instruments:
     threshold_red: 80.0
     threshold_yellow: 60.0
   RCDS_asd_60:
-    threshold_orange: 75.0
+    threshold_orange: 70.0
     threshold_red: 80.0
     threshold_yellow: 60.0
   RCDS_bufr_60:

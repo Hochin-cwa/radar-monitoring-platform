@@ -135,21 +135,21 @@ class TestGetInstruments:
 # ── PUT /api/v1/instruments/{file_type}/threshold ───────────
 
 class TestUpdateThreshold:
-    """需求 5.5：interval_minutes 驗證與儀器存在性檢查"""
+    """需求 5.5：三段閾值驗證與儀器存在性檢查"""
 
-    def test_returns_422_for_negative_interval_minutes(self):
-        """PUT 負數 interval_minutes 回傳 422（需求 5.5）"""
+    def test_returns_422_for_negative_threshold(self):
+        """PUT 負數閾值回傳 422（需求 5.5，gt=0.0）"""
         res = client.put(
             "/api/v1/instruments/RADAR_A/threshold",
-            json={"interval_minutes": -1.0},
+            json={"threshold_yellow": -1.0, "threshold_orange": 20.0, "threshold_red": 30.0},
         )
         assert res.status_code == 422
 
-    def test_returns_422_for_zero_interval_minutes(self):
-        """PUT interval_minutes=0 回傳 422（需求 5.5，gt=0.0）"""
+    def test_returns_422_for_zero_threshold(self):
+        """PUT 閾值=0 回傳 422（需求 5.5，gt=0.0）"""
         res = client.put(
             "/api/v1/instruments/RADAR_A/threshold",
-            json={"interval_minutes": 0.0},
+            json={"threshold_yellow": 0.0, "threshold_orange": 20.0, "threshold_red": 30.0},
         )
         assert res.status_code == 422
 
@@ -160,36 +160,35 @@ class TestUpdateThreshold:
                    return_value=known_instruments):
             res = client.put(
                 "/api/v1/instruments/NONEXISTENT_TYPE/threshold",
-                json={"interval_minutes": 10.0},
+                json={"threshold_yellow": 15.0, "threshold_orange": 20.0, "threshold_red": 30.0},
             )
         assert res.status_code == 404
 
-    def test_returns_200_for_valid_interval_minutes(self):
-        """PUT 有效 interval_minutes 回傳 200 與計算後的閾值"""
+    def test_returns_200_for_valid_thresholds(self):
+        """PUT 有效三段閾值回傳 200 並原樣回傳設定值"""
         instruments = [_make_instrument_dict("RADAR_A")]
         with patch("backend.routers.instruments.list_instruments",
                    return_value=instruments), \
-             patch("backend.routers.instruments.set_instrument_thresholds") as mock_set:
+             patch("backend.routers.instruments.set_instrument_thresholds_direct") as mock_set:
             res = client.put(
                 "/api/v1/instruments/RADAR_A/threshold",
-                json={"interval_minutes": 10.0},
+                json={"threshold_yellow": 15.0, "threshold_orange": 20.0, "threshold_red": 30.0},
             )
         assert res.status_code == 200
         data = res.json()
         assert data["file_type"] == "RADAR_A"
-        assert data["interval_minutes"] == 10.0
-        assert data["threshold_yellow"] == 15.0   # T + 5
-        assert data["threshold_orange"] == 20.0   # T + 10
-        assert data["threshold_red"] == 30.0      # T + 20
-        mock_set.assert_called_once_with("RADAR_A", 10.0)
+        assert data["threshold_yellow"] == 15.0
+        assert data["threshold_orange"] == 20.0
+        assert data["threshold_red"] == 30.0
+        mock_set.assert_called_once_with("RADAR_A", 15.0, 20.0, 30.0)
 
     def test_allows_update_when_db_unavailable(self):
         """DB 不可用（list_instruments 回傳空）時允許更新任意 file_type（不回傳 404）"""
         with patch("backend.routers.instruments.list_instruments", return_value=[]), \
-             patch("backend.routers.instruments.set_instrument_thresholds"):
+             patch("backend.routers.instruments.set_instrument_thresholds_direct"):
             res = client.put(
                 "/api/v1/instruments/ANY_TYPE/threshold",
-                json={"interval_minutes": 5.0},
+                json={"threshold_yellow": 5.0, "threshold_orange": 10.0, "threshold_red": 20.0},
             )
         assert res.status_code == 200
 
