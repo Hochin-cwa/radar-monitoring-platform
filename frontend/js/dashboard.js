@@ -1,228 +1,315 @@
 /**
- * dashboard.js — 儀器即時狀況頁面控制器
- * 依 Department 分組顯示儀器警示狀態，無趨勢圖。
+ * dashboard.js — 首頁儀表板控制器
+ * 顯示 Top 5 延遲儀器、Top 5 CPU、Top 5 記憶體、Top 5 磁碟
+ * 以水平長條圖風格呈現。
  */
 
 const REFRESH_INTERVAL_MS = 60_000;
 let _refreshTimer = null;
-let _activeDept = 'all';
-let _lastInstruments = null;
 
-const DEPT_LABELS = {
-  sos:  '衛星作業科',
-  dqcs: '品管科',
-  rsa:  '應用科',
-  wrs:  '氣象雷達科',
-  mrs:  '海象雷達科',
+/* ── 站碼→中文名稱對照表 ── */
+const STATION_NAME_MAP = {
+  // 雷達站
+  RCHL: '花蓮',
+  RCKT: '七股',
+  RCLY: '林園',
+  RCSL: '五分山',
+  RCNT: '南屯',
+  RCCK: '清泉崗（空軍）',
+  RCGR: '桃園（空軍）',
+  RCCG: '成功（空軍）',
+  RCWF: '五分山（另）',
+  RCMD: '墾丁（radman）',
+  // 空軍基地站
+  RCAY: '岡山（空軍）',
+  RCKU: '嘉義（空軍）',
+  RCNN: '台南（空軍）',
+  RCPO: '新竹（空軍）',
+  RCQS: '台東（空軍）',
+  RCYU: '花蓮（空軍）',
+  // 剖風儀雷達站
+  RCCL: '剖風儀 CL',
+  RCDS: '剖風儀 東沙',
+  // 高頻雷達
+  DS: '東沙',
+  HFradar_dt00: '大潭',
+  HFradar_ya01: '永安1',
+  HFradar_ya00: '永安',
+  HFradar_bg00: '北港',
+  HFradar_sl00: '沙崙',
+  HFradar_dj00: '東莒',
+  HFradar_gy00: '觀音',
+  // 衛星
+  HIMA: '向日葵9號',
+  GK2A: '千里眼2A',
 };
-const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
 
-function _pad(n) { return String(n).padStart(2, '0'); }
-function _formatDatetime(d) {
-  return `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())} ` +
-         `${_pad(d.getHours())}:${_pad(d.getMinutes())}:${_pad(d.getSeconds())}`;
-}
-function _tickClock() {
-  const now = new Date();
-  const utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
-  document.getElementById('local-time').textContent = _formatDatetime(now);
-  document.getElementById('utc-time').textContent   = _formatDatetime(utc);
-}
-function _showStatus(msg, type = 'error') {
-  const bar = document.getElementById('status-bar');
-  bar.textContent = msg;
-  bar.className = `status-bar ${type}`;
-}
-function _clearStatus() {
-  document.getElementById('status-bar').className = 'status-bar hidden';
+/**
+ * 從 file_type 提取站碼並回傳中文名稱（若有對應）
+ * 優先以完整 file_type 匹配，再以 _ 前綴匹配
+ */
+function _getStationChinese(fileType) {
+  if (!fileType) return '';
+  // 完整匹配（如 HFradar_dt00）
+  if (STATION_NAME_MAP[fileType]) return STATION_NAME_MAP[fileType];
+  // 前綴匹配（如 RCHL_rb5_CS → RCHL）
+  const prefix = fileType.split('_')[0];
+  return STATION_NAME_MAP[prefix] || '';
+  
 }
 
-const DISCONNECT_THRESHOLD_MIN = 14400;
-
-function _alertClass(diff, inst) {
-  if (diff == null || diff > DISCONNECT_THRESHOLD_MIN) return 'disconnected';
-  const red    = inst.threshold_red    ?? 20;
-  const orange = inst.threshold_orange ?? 15;
-  const yellow = inst.threshold_yellow ?? 10;
-  if (diff > red)    return 'alert-red';
-  if (diff > orange) return 'alert-orange';
-  if (diff > yellow) return 'alert-yellow';
-  return 'ok';
+/* ── 色階工具 ── */
+function _barColor(pct) {
+  // 0~50 綠→黃，50~80 黃→橘，80~100 橘→紅粉
+  if (pct <= 50) return `hsl(${120 - pct * 1.2}, 85%, 50%)`;
+  if (pct <= 80) return `hsl(${60 - (pct - 50) * 2}, 90%, 50%)`;
+  return `hsl(${0 + (100 - pct) * 1.5}, 90%, 65%)`;
 }
 
-function _makeCard(inst) {
-  const diff = inst.diff_time_minutes;
-  const level = _alertClass(diff, inst);
-  const isDisconnected = level === 'disconnected';
-  const isAlert = level !== 'ok' && !isDisconnected;
+function _valueColor(pct) {
+  if (pct >= 80) return '#ef4444';
+  if (pct >= 60) return '#fb923c';
+  if (pct >= 40) return '#facc15';
+  return '#4ade80';
+}
 
-  let diffDisplay, statusBadge;
-  if (isDisconnected) {
-    diffDisplay = '<span class="diff-disconnected">斷線</span>';
-    statusBadge = '<span class="badge-disconnected">⚠ 斷線</span>';
-  } else {
-    const diffText = diff != null ? diff.toFixed(1) + ' 分鐘' : 'N/A';
-    diffDisplay = `<span class="diff-time diff-${level}">${diffText}</span>`;
-    if (isAlert) {
-      statusBadge = `<span class="badge-${level}">⚠ 缺資料警示</span>`;
-    } else {
-      statusBadge = '<span class="ok-label">✓ 正常</span>';
-    }
-  }
-
-  const triggeredAt = (!isDisconnected && isAlert && inst.latest_file_time)
-    ? `<div class="triggered-at">最新資料：${new Date(inst.latest_file_time).toLocaleString('zh-TW')}</div>`
-    : '';
-
-  const fileType = inst.file_type || '';
-  const ip = inst.ip || '';
-  const equipmentName = inst.equipment_name || '';
-  const historyUrl = '/history.html?file_type=' + encodeURIComponent(fileType) +
-                     '&ip=' + encodeURIComponent(ip) +
-                     '&name=' + encodeURIComponent(equipmentName);
-
+/* ── 產生單條 bar HTML ── */
+function _renderBar(label, value, maxValue, unit = '') {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  const color = _barColor(pct);
+  const valColor = _valueColor(pct);
+  const unitHtml = unit ? `<span class="bar-unit">${unit}</span>` : '';
   return `
-    <div class="instrument-card level-${level}"
-         style="cursor:pointer"
-         data-file-type="${fileType}"
-         data-ip="${ip}"
-         data-equipment-name="${equipmentName}"
-         onclick="window.open('${historyUrl}', '_blank')">
-      <div class="card-meta">${inst.ip || '--'}</div>
-      <div class="card-title">${inst.file_type}</div>
-      <div class="card-name">${inst.equipment_name || '--'}</div>
-      <div style="margin:6px 0">${diffDisplay}</div>
-      ${statusBadge}
-      ${triggeredAt}
+    <div class="bar-item">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <div class="bar-value" style="color:${valColor}">${displayVal}${unitHtml}</div>
     </div>`;
 }
 
-function _isNormal(inst) {
-  const diff = inst.diff_time_minutes;
-  return diff != null && diff <= (inst.threshold_yellow ?? 10);
+/* ── 延遲儀器專用 bar（依閾值等級上色） ── */
+function _delayBarColor(diff, inst) {
+  const red    = inst.threshold_red    ?? 30;
+  const orange = inst.threshold_orange ?? 20;
+  const yellow = inst.threshold_yellow ?? 10;
+  if (diff > red)    return { bar: '#ef4444', val: '#ef4444' };   // 紅
+  if (diff > orange) return { bar: '#fb923c', val: '#fb923c' };   // 橘
+  if (diff > yellow) return { bar: '#facc15', val: '#facc15' };   // 黃
+  return { bar: '#4ade80', val: '#4ade80' };                       // 綠（不應出現）
 }
 
-function _renderInstruments(instruments) {
-  // 只在有新資料時才更新快取，篩選重繪時不覆寫
-  if (instruments !== null) {
-    _lastInstruments = instruments;
-  }
-  const source = _lastInstruments;
-
-  const container = document.getElementById('instruments-container');
-  if (!source || source.length === 0) {
-    container.innerHTML = '<p class="loading">目前無儀器資料</p>';
-    return;
-  }
-
-  // 依篩選過濾
-  const filtered = _activeDept === 'all'
-    ? source
-    : source.filter(i => (i.department || '').toLowerCase() === _activeDept);
-
-  if (filtered.length === 0) {
-    container.innerHTML = '<p class="loading">此科別目前無儀器資料</p>';
-    return;
-  }
-
-  // 依 department 分組
-  const groups = {};
-  for (const inst of filtered) {
-    const key = (inst.department || '').toLowerCase() || 'other';
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(inst);
-  }
-
-  const orderedKeys = DEPT_ORDER.filter(k => groups[k]);
-
-  container.innerHTML = orderedKeys.map(key => {
-    const label = DEPT_LABELS[key] || key;
-    const groupInsts = groups[key];
-    const total = groupInsts.length;
-
-    const normalInsts   = groupInsts.filter(_isNormal);
-    const abnormalInsts = groupInsts.filter(inst => !_isNormal(inst));
-    const normalCount   = normalInsts.length;
-
-    const abnormalCards = abnormalInsts.map(_makeCard).join('');
-
-    const normalSummaryId = `normal-cards-${key}`;
-    const normalSummary = normalCount > 0 ? `
-      <div class="normal-summary-box" aria-expanded="false">
-        <span class="normal-summary-icon">▶</span>
-        <span>共 ${total} 台，正常 ${normalCount} 台</span>
+function _renderDelayBar(label, value, maxValue, inst) {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  const colors = _delayBarColor(value, inst);
+  return `
+    <div class="bar-item">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
       </div>
-      <div class="normal-cards-collapse" id="${normalSummaryId}">
-        ${normalInsts.map(_makeCard).join('')}
-      </div>` : '';
-
-    const abnormalSection = abnormalCards
-      ? `<div class="group-cards">${abnormalCards}</div>`
-      : '';
-
-    return `
-      <div class="instrument-group">
-        <div class="group-header">
-          <span>${label}</span>
-        </div>
-        ${abnormalSection}
-        ${normalSummary}
-      </div>`;
-  }).join('');
-
-  // Wire up toggle: clicking summary box toggles the collapse panel
-  container.querySelectorAll('.normal-summary-box').forEach(box => {
-    box.addEventListener('click', () => {
-      const willExpand = !box.classList.contains('expanded');
-      box.classList.toggle('expanded', willExpand);
-      box.setAttribute('aria-expanded', String(willExpand));
-      const panel = box.nextElementSibling;
-      if (panel && panel.classList.contains('normal-cards-collapse')) {
-        panel.classList.toggle('open', willExpand);
-      }
-    });
-  });
+      <div class="bar-value" style="color:${colors.val}">${displayVal}<span class="bar-unit">分鐘</span></div>
+    </div>`;
 }
 
-async function _refreshData() {
-  try {
-    const data = await fetchCurrentStatus();
-    _renderInstruments(data.instruments);  // 有新資料，更新快取
-    _clearStatus();
-  } catch (e) {
-    _showStatus(
-      e.type === 'db_error' ? '資料庫連線失敗，顯示上次資料' : '資料更新失敗，正在重試…',
-      e.type === 'db_error' ? 'error' : 'warning'
-    );
+/* ── 渲染延遲時間異常儀器（全部） ── */
+function _renderDelayAll(instruments) {
+  const container = document.getElementById('top-delay');
+  if (!instruments || instruments.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
   }
-  document.getElementById('last-refreshed').textContent = _formatDatetime(new Date());
+
+  // 過濾掉斷線（diff_time_minutes 為 null 或極大值 ≥14400）
+  // 只顯示超過 threshold_yellow 的異常儀器
+  const abnormal = instruments.filter(i => {
+    if (i.diff_time_minutes == null || i.diff_time_minutes >= 14400) return false;
+    const threshold = i.threshold_yellow ?? 10;
+    return i.diff_time_minutes > threshold;
+  });
+  const sorted = abnormal.sort((a, b) => b.diff_time_minutes - a.diff_time_minutes);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">所有儀器正常</p>';
+    return;
+  }
+
+  const maxVal = sorted[0].diff_time_minutes || 1;
+
+  // 相同中文名稱只顯示延遲最大的一筆
+  const seen = new Set();
+  const deduped = [];
+  for (const inst of sorted) {
+    const fileType = inst.file_type || '--';
+    const chineseName = _getStationChinese(fileType);
+    const key = chineseName || `${fileType}_${inst.ip || ''}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(inst);
+    }
+  }
+
+  container.innerHTML = deduped.map(inst => {
+    const ip = inst.ip || '';
+    const fileType = inst.file_type || '--';
+    const chineseName = _getStationChinese(fileType);
+    const label = chineseName
+      ? `${chineseName} ${fileType}`
+      : (ip ? `${fileType} (${ip})` : fileType);
+    return _renderDelayBar(label, inst.diff_time_minutes, maxVal, inst);
+  }).join('');
 }
 
-function _resetRefreshTimer() {
-  clearInterval(_refreshTimer);
-  _refreshTimer = setInterval(_refreshData, REFRESH_INTERVAL_MS);
+/* ── 渲染 CPU Top 5 ── */
+function _renderCpuTop5(computers) {
+  const container = document.getElementById('top-cpu');
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+
+  const valid = computers.filter(c => c.load_1 != null);
+  const sorted = valid.sort((a, b) => b.load_1 - a.load_1).slice(0, 5);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無 CPU 負載資料</p>';
+    return;
+  }
+
+  // CPU load 1 通常可能超過 100（多核），取 top 的值當做 max
+  const maxVal = Math.max(sorted[0].load_1, 100);
+  container.innerHTML = sorted.map(c => {
+    const label = c.ip || c.equipment_name || '--';
+    return _renderBar(label, c.load_1, maxVal);
+  }).join('');
 }
 
-async function _init() {
-  _tickClock();
-  setInterval(_tickClock, 1000);
+/* ── 渲染記憶體 Top 5 ── */
+function _memBarColor(memPct) {
+  if (memPct > 80) return { bar: '#ef4444', val: '#ef4444' };
+  if (memPct > 70) return { bar: '#fb923c', val: '#fb923c' };
+  if (memPct > 60) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
 
-  // 科別篩選按鈕
-  document.querySelectorAll('.dept-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.dept-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      _activeDept = btn.dataset.dept;
-      _renderInstruments(null);  // 用現有快取重繪，不覆寫 _lastInstruments
-    });
-  });
+function _renderMemBar(label, value, maxValue) {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  const colors = _memBarColor(value);
+  return `
+    <div class="bar-item">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
+      </div>
+      <div class="bar-value" style="color:${colors.val}">${displayVal}</div>
+    </div>`;
+}
 
-  document.getElementById('btn-refresh').addEventListener('click', () => {
-    _refreshData();
-    _resetRefreshTimer();
-  });
-  await _refreshData();
-  _resetRefreshTimer();
+function _renderMemoryTop5(computers) {
+  const container = document.getElementById('top-memory');
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+
+  const valid = computers.filter(c => c.memory_use != null);
+  const sorted = valid.sort((a, b) => b.memory_use - a.memory_use).slice(0, 5);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無記憶體資料</p>';
+    return;
+  }
+
+  container.innerHTML = sorted.map(c => {
+    const label = c.ip || c.equipment_name || '--';
+    return _renderMemBar(label, c.memory_use, 100);
+  }).join('');
+}
+
+/* ── 渲染磁碟 Top 5 ── */
+function _diskBarColor(usedPct) {
+  // 剩餘空間 = 100 - usedPct
+  // < 1% 剩餘 (used > 99%) → 紅
+  // < 5% 剩餘 (used > 95%) → 橘
+  // < 10% 剩餘 (used > 90%) → 黃
+  // 其餘 → 綠
+  if (usedPct > 99) return { bar: '#ef4444', val: '#ef4444' };
+  if (usedPct > 95) return { bar: '#fb923c', val: '#fb923c' };
+  if (usedPct > 90) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
+
+function _renderDiskBar(label, value, maxValue) {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  const colors = _diskBarColor(value);
+  return `
+    <div class="bar-item">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
+      </div>
+      <div class="bar-value" style="color:${colors.val}">${displayVal}</div>
+    </div>`;
+}
+
+function _renderDiskTop5(computers) {
+  const container = document.getElementById('top-disk');
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+
+  // 攤平所有磁碟項目，取最高使用率
+  const diskItems = [];
+  for (const c of computers) {
+    if (!c.disks || c.disks.length === 0) continue;
+    for (const d of c.disks) {
+      if (d.used_pct != null) {
+        diskItems.push({
+          label: `${c.ip} ${d.file_system}`,
+          value: d.used_pct,
+        });
+      }
+    }
+  }
+
+  const sorted = diskItems.sort((a, b) => b.value - a.value).slice(0, 5);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無磁碟資料</p>';
+    return;
+  }
+
+  container.innerHTML = sorted.map(item => {
+    return _renderDiskBar(item.label, item.value, 100);
+  }).join('');
+}
+
+/* ── 主更新 ── */
+async function _refreshDashboard() {
+  try {
+    const [statusData, computerData] = await Promise.all([
+      fetchCurrentStatus(),
+      fetchComputerStatus(),
+    ]);
+    _renderDelayAll(statusData.instruments);
+    _renderCpuTop5(computerData.items);
+    _renderMemoryTop5(computerData.items);
+    _renderDiskTop5(computerData.items);
+  } catch (e) {
+    // 個別面板的錯誤不阻斷整體
+    console.error('[dashboard] refresh error', e);
+  }
+}
+
+function _init() {
+  _refreshDashboard();
+  _refreshTimer = setInterval(_refreshDashboard, REFRESH_INTERVAL_MS);
 }
 
 document.addEventListener('DOMContentLoaded', _init);

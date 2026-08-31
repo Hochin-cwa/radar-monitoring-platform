@@ -6,12 +6,11 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from backend.models import (
-    InstrumentIntervalSetting, InstrumentListItem, InstrumentListResponse,
+    InstrumentListItem, InstrumentListResponse,
     ThresholdDirectSetting, ThresholdUpdateResponse,
 )
 from backend.services.alert_service import (
-    calculate_thresholds, get_instrument_thresholds,
-    list_instruments, set_instrument_thresholds, set_instrument_thresholds_direct,
+    list_instruments, set_instrument_thresholds_direct,
 )
 
 logger = logging.getLogger("routers.instruments")
@@ -39,6 +38,7 @@ def get_instruments() -> InstrumentListResponse:
 @router.post("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
 @router.put("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
 def update_threshold(file_type: str, body: ThresholdDirectSetting) -> ThresholdUpdateResponse:
+    """接受前端直接設定的三個閾值並持久化。"""
     # 只在 DB 可用時驗證 file_type 是否存在；DB 不可用時直接允許更新
     instruments = list_instruments()
     if instruments:

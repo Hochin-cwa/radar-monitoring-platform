@@ -1,0 +1,15 @@
+# 各儀器警示閾值設定（分鐘）
+# 修改後重啟服務或透過網頁設定介面更新
+# 若儀器不在此清單中，使用 defaults.interval_minutes 的預設值
+#
+# 系統自動計算三段閾值：
+#   threshold_yellow = interval_minutes + 5
+#   threshold_orange = interval_minutes + 10
+#   threshold_red    = interval_minutes + 20
+#
+# 預設 interval_minutes = 7 → yellow=12, orange=17, red=27
+
+defaults:
+  interval_minutes: 7
+
+instruments: {}

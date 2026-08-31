@@ -3,40 +3,63 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>儀器閾值設定 — 雷達監控整合平台</title>
+  <title>儀器閾值設定 — 遙測作業系統資料傳輸監控整合平台</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
-<body>
-  <header>
-    <div class="header-left">
-      <a href="/" class="back-link">← 首頁</a>
-      <h1>儀器閾值設定</h1>
+<body class="layout">
+  <!-- 頁首（含全域導覽列） -->
+  <header class="site-header">
+    <div class="header-title">
+      <div class="header-line1">中央氣象署海氣遙測組</div>
+      <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
     </div>
+    <nav class="header-nav">
+      <a href="/index.html" class="global-nav-link">首頁</a>
+      <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
+      <a href="/computers.html" class="global-nav-link">電腦即時狀況</a>
+      <a href="/settings.html" class="global-nav-link active">閾值設定</a>
+      <a href="/environment-history.html?ip=192.168.178.19" class="global-nav-link">環境監控</a>
+    </nav>
     <div class="time-bar">
       <span>本地時間：<span id="local-time">--</span></span>
       <span>UTC：<span id="utc-time">--</span></span>
     </div>
   </header>
 
-  <main>
-    <div id="status-bar" class="status-bar hidden"></div>
-    <section class="section">
-      <h2>各儀器最大時間差閾值（分鐘）</h2>
-      <table id="threshold-table">
-        <thead>
-          <tr>
-            <th>儀器代碼</th>
-            <th>設備名稱</th>
-            <th style="color:#facc15">黃色閾值（分鐘）</th>
-            <th style="color:#fb923c">橙色閾值（分鐘）</th>
-            <th style="color:#ef4444">紅色閾值（分鐘）</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="threshold-tbody"></tbody>
-      </table>
-    </section>
-  </main>
+  <!-- 內容區塊 -->
+  <div class="page-body">
+    <!-- 區域導覽 -->
+    <aside class="local-nav">
+      <h3 class="local-nav-title">設定項目</h3>
+      <a href="#threshold-section" class="local-nav-item active">儀器閾值</a>
+    </aside>
+
+    <!-- 主要內容 -->
+    <main class="main-content">
+      <div id="status-bar" class="status-bar hidden"></div>
+      <section id="threshold-section" class="section">
+        <h2>各儀器最大時間差閾值（分鐘）</h2>
+        <table id="threshold-table">
+          <thead>
+            <tr>
+              <th>儀器代碼</th>
+              <th>設備名稱</th>
+              <th style="color:#facc15">黃色閾值（分鐘）</th>
+              <th style="color:#fb923c">橙色閾值（分鐘）</th>
+              <th style="color:#ef4444">紅色閾值（分鐘）</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="threshold-tbody"></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <!-- 頁尾 -->
+  <footer class="site-footer">
+    <span>© 2026 中央氣象署海氣遙測組 遙測作業系統資料傳輸監控整合平台 | 聯絡我們：遙測應用科</span>
+  </footer>
 
   <script src="/js/api.js"></script>
   <script src="/js/settings.js"></script>
