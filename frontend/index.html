@@ -3,72 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>遙測作業系統資料傳輸監控整合平台</title>
+  <title>導向中… — 遙測作業系統資料傳輸監控整合平台</title>
+  <!-- 首頁已停用，導向至儀器即時狀況頁面 -->
+  <meta http-equiv="refresh" content="0; url=/instruments.html" />
+  <script>
+    // 立即導向（replace 不留下瀏覽紀錄，避免返回鍵回到此頁）
+    window.location.replace('/instruments.html');
+  </script>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body class="layout">
-  <!-- 頁首 + 全域導覽列（合併） -->
-  <header class="site-header">
-    <div class="header-title">
-      <div class="header-line1">中央氣象署海氣遙測組</div>
-      <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
-    </div>
-    <nav class="header-nav">
-      <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
-      <a href="/computers.html" class="global-nav-link">電腦即時狀況</a>
-      <a href="/settings.html" class="global-nav-link">閾值設定</a>
-      <a href="/environment-history.html?ip=192.168.178.19" class="global-nav-link">環境監控</a>
-    </nav>
-    <div class="time-bar">
-      <span>本地時間：<span id="local-time">--</span></span>
-      <span>UTC：<span id="utc-time">--</span></span>
-    </div>
-  </header>
-
-  <!-- 內容區塊 -->
   <main class="content">
-    <div class="dashboard-grid">
-      <!-- 延遲時間異常儀器 -->
-      <section class="dash-panel dash-panel-scroll">
-        <h2 class="panel-title">延遲時間異常儀器</h2>
-        <div id="top-delay" class="bar-list">
-          <p class="loading">載入中…</p>
-        </div>
-      </section>
-
-      <!-- CPU 負載 Top 5 -->
-      <section class="dash-panel">
-        <h2 class="panel-title">CPU 負載 TOP 5 電腦</h2>
-        <div id="top-cpu" class="bar-list">
-          <p class="loading">載入中…</p>
-        </div>
-      </section>
-
-      <!-- 記憶體使用率 Top 5 -->
-      <section class="dash-panel">
-        <h2 class="panel-title">記憶體使用率 TOP 5 電腦</h2>
-        <div id="top-memory" class="bar-list">
-          <p class="loading">載入中…</p>
-        </div>
-      </section>
-
-      <!-- 磁碟使用率 Top 5 -->
-      <section class="dash-panel">
-        <h2 class="panel-title">磁碟使用率 TOP 5 電腦</h2>
-        <div id="top-disk" class="bar-list">
-          <p class="loading">載入中…</p>
-        </div>
-      </section>
-    </div>
+    <p class="loading">導向至儀器即時狀況頁面…若未自動跳轉，請點選 <a href="/instruments.html">此連結</a>。</p>
   </main>
-
-  <!-- 頁尾 -->
-  <footer class="site-footer">
-    <span>© 2026 中央氣象署海氣遙測組 遙測作業系統資料傳輸監控整合平台 | 聯絡我們：遙測應用科</span>
-  </footer>
-
-  <script src="/js/api.js"></script>
-  <script src="/js/clock.js"></script>
-  <script src="/js/dashboard.js"></script>
 </body>
 </html>
