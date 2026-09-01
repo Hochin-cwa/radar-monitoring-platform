@@ -14,7 +14,6 @@
       <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
     </div>
     <nav class="header-nav">
-      <a href="/index.html" class="global-nav-link">首頁</a>
       <a href="/instruments.html" class="global-nav-link active">儀器即時狀況</a>
       <a href="/computers.html" class="global-nav-link">電腦即時狀況</a>
       <a href="/settings.html" class="global-nav-link">閾值設定</a>
@@ -50,6 +49,35 @@
         <h2>儀器警示狀態</h2>
         <div id="instruments-container" class="instruments-grid">
           <p class="loading">載入中…</p>
+        </div>
+      </section>
+
+      <!-- 電腦資源 TOP 5 面板 -->
+      <section class="section">
+        <div class="dashboard-grid">
+          <!-- CPU 負載 Top 5 -->
+          <div class="dash-panel">
+            <h2 class="panel-title">CPU 負載 TOP 5 電腦</h2>
+            <div id="top-cpu" class="bar-list">
+              <p class="loading">載入中…</p>
+            </div>
+          </div>
+
+          <!-- 記憶體使用率 Top 5 -->
+          <div class="dash-panel">
+            <h2 class="panel-title">記憶體使用率 TOP 5 電腦</h2>
+            <div id="top-memory" class="bar-list">
+              <p class="loading">載入中…</p>
+            </div>
+          </div>
+
+          <!-- 磁碟使用率 Top 5 -->
+          <div class="dash-panel">
+            <h2 class="panel-title">磁碟使用率 TOP 5 電腦</h2>
+            <div id="top-disk" class="bar-list">
+              <p class="loading">載入中…</p>
+            </div>
+          </div>
         </div>
       </section>
     </main>

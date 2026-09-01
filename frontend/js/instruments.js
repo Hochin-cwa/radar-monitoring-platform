@@ -205,6 +205,121 @@ function _renderInstruments(instruments) {
   });
 }
 
+/* ── 電腦資源 TOP 5 面板（CPU / 記憶體 / 磁碟）── */
+
+/* 產生單條 bar HTML */
+function _renderBar(label, value, maxValue, colors) {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  return `
+    <div class="bar-item">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
+      </div>
+      <div class="bar-value" style="color:${colors.val}">${displayVal}</div>
+    </div>`;
+}
+
+/* CPU 色階（load 值，非百分比，統一綠色系呈現長度） */
+function _cpuBarColor(pct) {
+  if (pct >= 80) return { bar: '#ef4444', val: '#ef4444' };
+  if (pct >= 60) return { bar: '#fb923c', val: '#fb923c' };
+  if (pct >= 40) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
+
+function _renderCpuTop5(computers) {
+  const container = document.getElementById('top-cpu');
+  if (!container) return;
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+  const valid = computers.filter(c => c.load_1 != null);
+  const sorted = valid.sort((a, b) => b.load_1 - a.load_1).slice(0, 5);
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無 CPU 負載資料</p>';
+    return;
+  }
+  const maxVal = Math.max(sorted[0].load_1, 100);
+  container.innerHTML = sorted.map(c => {
+    const label = c.ip || c.equipment_name || '--';
+    const pct = maxVal > 0 ? Math.min((c.load_1 / maxVal) * 100, 100) : 0;
+    return _renderBar(label, c.load_1, maxVal, _cpuBarColor(pct));
+  }).join('');
+}
+
+function _memBarColor(memPct) {
+  if (memPct > 80) return { bar: '#ef4444', val: '#ef4444' };
+  if (memPct > 70) return { bar: '#fb923c', val: '#fb923c' };
+  if (memPct > 60) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
+
+function _renderMemoryTop5(computers) {
+  const container = document.getElementById('top-memory');
+  if (!container) return;
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+  const valid = computers.filter(c => c.memory_use != null);
+  const sorted = valid.sort((a, b) => b.memory_use - a.memory_use).slice(0, 5);
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無記憶體資料</p>';
+    return;
+  }
+  container.innerHTML = sorted.map(c => {
+    const label = c.ip || c.equipment_name || '--';
+    return _renderBar(label, c.memory_use, 100, _memBarColor(c.memory_use));
+  }).join('');
+}
+
+function _diskBarColor(usedPct) {
+  if (usedPct > 99) return { bar: '#ef4444', val: '#ef4444' };
+  if (usedPct > 95) return { bar: '#fb923c', val: '#fb923c' };
+  if (usedPct > 90) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
+
+function _renderDiskTop5(computers) {
+  const container = document.getElementById('top-disk');
+  if (!container) return;
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+  const diskItems = [];
+  for (const c of computers) {
+    if (!c.disks || c.disks.length === 0) continue;
+    for (const d of c.disks) {
+      if (d.used_pct != null) {
+        diskItems.push({ label: `${c.ip} ${d.file_system}`, value: d.used_pct });
+      }
+    }
+  }
+  const sorted = diskItems.sort((a, b) => b.value - a.value).slice(0, 5);
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無磁碟資料</p>';
+    return;
+  }
+  container.innerHTML = sorted.map(item =>
+    _renderBar(item.label, item.value, 100, _diskBarColor(item.value))
+  ).join('');
+}
+
+async function _refreshComputerPanels() {
+  try {
+    const computerData = await fetchComputerStatus();
+    _renderCpuTop5(computerData.items);
+    _renderMemoryTop5(computerData.items);
+    _renderDiskTop5(computerData.items);
+  } catch (e) {
+    console.error('[instruments] computer panels refresh error', e);
+  }
+}
+
 async function _refreshData() {
   try {
     const data = await fetchCurrentStatus();
@@ -216,6 +331,7 @@ async function _refreshData() {
       e.type === 'db_error' ? 'error' : 'warning'
     );
   }
+  await _refreshComputerPanels();
   document.getElementById('last-refreshed').textContent = _formatDatetime(new Date());
 }
 
