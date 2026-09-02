@@ -106,27 +106,32 @@
       if (_diffChart) { _diffChart.destroy(); _diffChart = null; }
       return;
     }
-    // y 軸以實際 diff_time_minutes 範圍為準（上下留 10% 邊界）。
-    // 否則閾值線（例如紅色 27 分）會把 7~8 分的資料壓成一條平線。
-    // 資料量可能上萬筆，用迴圈而非 Math.min(...arr) 避免超出參數上限。
-    let yMin = points[0].y;
-    let yMax = points[0].y;
-    for (const p of points) {
-      if (p.y < yMin) yMin = p.y;
-      if (p.y > yMax) yMax = p.y;
-    }
-    const pad = Math.max((yMax - yMin) * 0.1, 0.1);
-    const axisMin = Math.max(0, yMin - pad);
-    const axisMax = yMax + pad;
 
-    // 閾值水平線：以 borderDash 虛線 dataset 實作。
-    // 只有落在 y 軸範圍內的閾值才畫出來，圖例才會與實際線條一致。
     const tYellow = thresholdYellow != null ? thresholdYellow : null;
     const tOrange = thresholdOrange != null ? thresholdOrange : null;
     const tRed = thresholdRed != null ? thresholdRed : null;
 
+    // y 軸改為固定範圍：從 0 起算，上界必須同時容納資料最大值與三個閾值，
+    // 並額外保留 10% 邊界，讓最高的閾值線（通常是紅色）不會貼齊上緣。
+    // 資料量可能上萬筆，用迴圈而非 Math.max(...arr) 避免超出參數上限。
+    let dataMax = points[0].y;
+    for (const p of points) {
+      if (p.y > dataMax) dataMax = p.y;
+    }
+    const thresholdMax = Math.max(
+      tYellow != null ? tYellow : 0,
+      tOrange != null ? tOrange : 0,
+      tRed != null ? tRed : 0,
+    );
+    // 固定 y 軸下界為 0，上界取「資料最大值」與「最大閾值」中較大者再加 10% 邊界，
+    // 並設一個最小高度（至少 1 分）避免資料與閾值都極小時圖形被壓扁。
+    const axisMin = 0;
+    const axisMax = Math.max(dataMax, thresholdMax, 1) * 1.1;
+
+    // 閾值水平線：以 borderDash 虛線 dataset 實作。
+    // 固定範圍已保證三個閾值都落在 y 軸內，因此一律畫出，圖例與線條一致。
     function thresholdDataset(value, color, label) {
-      if (value == null || value < axisMin || value > axisMax) return null;
+      if (value == null) return null;
       const first = points[0].x;
       const last = points[points.length - 1].x;
       return {
@@ -176,17 +181,59 @@
       label: ctx => `${ctx.dataset.label}：${Number(ctx.parsed.y).toFixed(3)} 分`,
     };
     options.scales.x.time.tooltipFormat = 'yyyy-MM-dd HH:mm:ss';
+    // 固定 y 軸範圍
     options.scales.y.min = axisMin;
     options.scales.y.max = axisMax;
+    // 提供給 threshold 標籤外掛使用的閾值資訊
+    options._thresholds = [
+      { value: tYellow, color: '#facc15', text: `黃 ${tYellow != null ? tYellow : '--'} 分` },
+      { value: tOrange, color: '#fb923c', text: `橙 ${tOrange != null ? tOrange : '--'} 分` },
+      { value: tRed, color: '#ef4444', text: `紅 ${tRed != null ? tRed : '--'} 分` },
+    ];
 
     if (_diffChart) {
       _diffChart.data.datasets = datasets;
       _diffChart.options = options;
       _diffChart.update('none');
     } else {
-      _diffChart = new Chart(canvas, { type: 'line', data: { datasets }, options });
+      _diffChart = new Chart(canvas, {
+        type: 'line',
+        data: { datasets },
+        options,
+        plugins: [_thresholdLabelPlugin],
+      });
     }
   }
+
+  // ── 閾值數值標籤外掛 ──────────────────────────────────────
+  // 直接在每條閾值虛線的右端（繪圖區內）標示該閾值數值，
+  // 讓使用者不必看圖例就能在圖上讀到三個閾值。
+  const _thresholdLabelPlugin = {
+    id: 'thresholdLabels',
+    afterDatasetsDraw(chart) {
+      const thresholds = chart.options && chart.options._thresholds;
+      if (!thresholds) return;
+      const yScale = chart.scales.y;
+      const area = chart.chartArea;
+      if (!yScale || !area) return;
+
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.font = '600 11px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+
+      for (const t of thresholds) {
+        if (t.value == null) continue;
+        const y = yScale.getPixelForValue(t.value);
+        if (y < area.top || y > area.bottom) continue;
+        ctx.fillStyle = t.color;
+        // 標籤貼在虛線上方、繪圖區右內側，避免蓋住線條
+        ctx.fillText(t.text, area.right - 6, y - 2);
+      }
+      ctx.restore();
+    },
+  };
 
   // ── 建立或更新系統圖（通用） ──────────────────────────────
   // chartInstances stores { canvasId: Chart instance }
