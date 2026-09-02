@@ -184,56 +184,15 @@
     // 固定 y 軸範圍
     options.scales.y.min = axisMin;
     options.scales.y.max = axisMax;
-    // 提供給 threshold 標籤外掛使用的閾值資訊
-    options._thresholds = [
-      { value: tYellow, color: '#facc15', text: `黃 ${tYellow != null ? tYellow : '--'} 分` },
-      { value: tOrange, color: '#fb923c', text: `橙 ${tOrange != null ? tOrange : '--'} 分` },
-      { value: tRed, color: '#ef4444', text: `紅 ${tRed != null ? tRed : '--'} 分` },
-    ];
 
     if (_diffChart) {
       _diffChart.data.datasets = datasets;
       _diffChart.options = options;
       _diffChart.update('none');
     } else {
-      _diffChart = new Chart(canvas, {
-        type: 'line',
-        data: { datasets },
-        options,
-        plugins: [_thresholdLabelPlugin],
-      });
+      _diffChart = new Chart(canvas, { type: 'line', data: { datasets }, options });
     }
   }
-
-  // ── 閾值數值標籤外掛 ──────────────────────────────────────
-  // 直接在每條閾值虛線的右端（繪圖區內）標示該閾值數值，
-  // 讓使用者不必看圖例就能在圖上讀到三個閾值。
-  const _thresholdLabelPlugin = {
-    id: 'thresholdLabels',
-    afterDatasetsDraw(chart) {
-      const thresholds = chart.options && chart.options._thresholds;
-      if (!thresholds) return;
-      const yScale = chart.scales.y;
-      const area = chart.chartArea;
-      if (!yScale || !area) return;
-
-      const ctx = chart.ctx;
-      ctx.save();
-      ctx.font = '600 11px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'bottom';
-
-      for (const t of thresholds) {
-        if (t.value == null) continue;
-        const y = yScale.getPixelForValue(t.value);
-        if (y < area.top || y > area.bottom) continue;
-        ctx.fillStyle = t.color;
-        // 標籤貼在虛線上方、繪圖區右內側，避免蓋住線條
-        ctx.fillText(t.text, area.right - 6, y - 2);
-      }
-      ctx.restore();
-    },
-  };
 
   // ── 建立或更新系統圖（通用） ──────────────────────────────
   // chartInstances stores { canvasId: Chart instance }
