@@ -293,6 +293,37 @@
     .related-inst-card .ri-badge-red { background: #7f1d1d; color: #fca5a5; }
     .related-inst-card .ri-badge-disconnected { background: #374151; color: #d1d5db; }
 
+    /* ── 右欄下拉式選單：儀器狀態項目（燈號 + 文字） ── */
+    .ri-status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ri-light {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 4px currentColor;
+    }
+    .ri-light-ok { background: #4ade80; color: #4ade80; }
+    .ri-light-yellow { background: #facc15; color: #facc15; }
+    .ri-light-orange { background: #fb923c; color: #fb923c; }
+    .ri-light-red { background: #ef4444; color: #ef4444; }
+    .ri-light-disconnected { background: #9ca3af; color: #9ca3af; box-shadow: none; }
+    .ri-status-text {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .ri-status-text.ri-badge-ok { background: #166534; color: #bbf7d0; }
+    .ri-status-text.ri-badge-yellow { background: #854d0e; color: #fef08a; }
+    .ri-status-text.ri-badge-orange { background: #9a3412; color: #fed7aa; }
+    .ri-status-text.ri-badge-red { background: #7f1d1d; color: #fca5a5; }
+    .ri-status-text.ri-badge-disconnected { background: #374151; color: #d1d5db; }
+
     /* Responsive for 4K */
     @media (min-width: 2560px) {
       .chart-wrapper { height: 400px; }
@@ -415,7 +446,7 @@
     <!-- 右欄：關聯儀器即時狀態 -->
     <aside class="col-right">
       <h3>相關儀器即時狀態</h3>
-      <div id="related-instruments-list" class="related-instruments-grid">
+      <div id="related-instruments-list">
         <p class="loading" style="font-size:0.8rem;color:#64748b;">載入中…</p>
       </div>
     </aside>

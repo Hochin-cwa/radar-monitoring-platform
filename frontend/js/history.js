@@ -616,7 +616,32 @@
       }
     }
 
-    // ── 右欄：載入同 IP 的儀器（卡片含狀態燈號） ────────
+    // ── 依 file_type 將儀器歸類為四種類型（與後端 status 表歸類邏輯一致） ──
+    // 類型：radar / satellite / HFradar / radarwindprofiler
+    function _categorizeInstrument(fileType) {
+      const ft = fileType || '';
+      if (ft.indexOf('HF') !== -1) return 'HFradar';
+      if (ft.indexOf('satellite') !== -1 || ft.indexOf('SAT') !== -1 ||
+          ft.startsWith('HIMA_') || ft.startsWith('GK2A_')) return 'satellite';
+      if (ft.indexOf('windprofiler') !== -1 || ft.indexOf('WP') !== -1 ||
+          ft.startsWith('RCCL_') || ft.startsWith('RCDS_')) return 'radarwindprofiler';
+      return 'radar';
+    }
+
+    // 計算單一儀器的燈號等級與狀態文字
+    function _instrumentLevel(inst) {
+      const diff = inst.diff_time_minutes;
+      const ty = inst.threshold_yellow ?? 10;
+      const to = inst.threshold_orange ?? 15;
+      const tr = inst.threshold_red ?? 20;
+      if (diff == null || diff >= 14400) return { level: 'disconnected', badgeText: '⚠ 斷線' };
+      if (diff > tr) return { level: 'red', badgeText: '⚠ 異常' };
+      if (diff > to) return { level: 'orange', badgeText: '⚠ 異常' };
+      if (diff > ty) return { level: 'yellow', badgeText: '⚠ 異常' };
+      return { level: 'ok', badgeText: '✓ 正常' };
+    }
+
+    // ── 右欄：載入同 IP 的儀器（下拉式選單，含狀態燈號） ────────
     async function loadRelatedInstruments() {
       try {
         const data = await fetchCurrentStatus();
@@ -629,47 +654,61 @@
           return;
         }
 
-        list.innerHTML = related.map(inst => {
-          const diff = inst.diff_time_minutes;
-          const threshold_yellow = inst.threshold_yellow ?? 10;
-          const threshold_orange = inst.threshold_orange ?? 15;
-          const threshold_red = inst.threshold_red ?? 20;
+        // 依四種類型分組
+        const TYPE_KEYS = ['radar', 'satellite', 'HFradar', 'radarwindprofiler'];
+        const TYPE_LABELS = {
+          radar: 'radar',
+          satellite: 'satellite',
+          HFradar: 'HFradar',
+          radarwindprofiler: 'radarwindprofiler',
+        };
+        const groups = {};
+        for (const inst of related) {
+          const key = _categorizeInstrument(inst.file_type);
+          (groups[key] = groups[key] || []).push(inst);
+        }
 
-          let level, diffText, badgeText;
-          if (diff == null || diff >= 14400) {
-            level = 'disconnected';
-            diffText = '斷線';
-            badgeText = '⚠ 斷線';
-          } else if (diff > threshold_red) {
-            level = 'red';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '⚠ 異常';
-          } else if (diff > threshold_orange) {
-            level = 'orange';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '⚠ 異常';
-          } else if (diff > threshold_yellow) {
-            level = 'yellow';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '⚠ 異常';
-          } else {
-            level = 'ok';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '✓ 正常';
+        let html = '';
+        // 只顯示有對應儀器的類型下拉，完全隱藏空的類型
+        for (const key of TYPE_KEYS) {
+          const groupItems = groups[key] || [];
+          if (groupItems.length === 0) continue;
+          const label = TYPE_LABELS[key];
+          // 目前檢視的儀器所屬類型預設展開
+          const containsCurrent = groupItems.some(inst => inst.file_type === FILE_TYPE);
+          html += `<button class="dept-toggle-btn${containsCurrent ? ' expanded' : ''}" data-type-key="${key}">${label}</button>`;
+          html += `<div class="dept-computer-list${containsCurrent ? ' show' : ''}" data-type-list="${key}">`;
+          for (const inst of groupItems) {
+            const { level, badgeText } = _instrumentLevel(inst);
+            const isActive = inst.file_type === FILE_TYPE;
+            const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
+                        '&ip=' + encodeURIComponent(inst.ip || '') +
+                        '&name=' + encodeURIComponent(inst.equipment_name || '');
+            // 卡片只保留：儀器狀況燈號 + 狀態文字（移除重複的 IP／名稱等資訊）
+            html += `<a class="nav-item ri-status-item${isActive ? ' active' : ''}" href="${url}">
+              <span class="ri-light ri-light-${level}"></span>
+              <span class="ri-status-text ri-badge-${level}">${badgeText}</span>
+            </a>`;
           }
+          html += '</div>';
+        }
+        list.innerHTML = html;
 
-          const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
-                      '&ip=' + encodeURIComponent(inst.ip || '') +
-                      '&name=' + encodeURIComponent(inst.equipment_name || '');
-
-          return `<a class="related-inst-card" href="${url}">
-            <div class="ri-ip">${inst.ip || '--'}</div>
-            <div class="ri-filetype">${inst.file_type || '--'}</div>
-            <div class="ri-name">${inst.equipment_name || '--'}</div>
-            <div class="ri-diff ri-${level}">${diffText}</div>
-            <span class="ri-badge ri-badge-${level}">${badgeText}</span>
-          </a>`;
-        }).join('');
+        // 綁定展開/收合切換
+        list.querySelectorAll('.dept-toggle-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const key = btn.dataset.typeKey;
+            const sub = list.querySelector(`.dept-computer-list[data-type-list="${key}"]`);
+            const isExpanded = btn.classList.contains('expanded');
+            if (isExpanded) {
+              btn.classList.remove('expanded');
+              sub.classList.remove('show');
+            } else {
+              btn.classList.add('expanded');
+              sub.classList.add('show');
+            }
+          });
+        });
       } catch (e) {
         document.getElementById('related-instruments-list').innerHTML = '<p style="color:#64748b;font-size:0.78rem;">無法載入</p>';
       }
