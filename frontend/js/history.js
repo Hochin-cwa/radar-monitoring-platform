@@ -684,9 +684,12 @@
             const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
                         '&ip=' + encodeURIComponent(inst.ip || '') +
                         '&name=' + encodeURIComponent(inst.equipment_name || '');
-            // 卡片只保留：儀器狀況燈號 + 狀態文字（移除重複的 IP／名稱等資訊）
+            // 卡片保留：file_type（區分組內各儀器）+ 儀器狀況燈號 + 狀態文字
+            // （移除重複的 IP／名稱等資訊）
+            const ftLabel = inst.file_type || '--';
             html += `<a class="nav-item ri-status-item${isActive ? ' active' : ''}" href="${url}">
               <span class="ri-light ri-light-${level}"></span>
+              <span class="ri-status-ft">${ftLabel}</span>
               <span class="ri-status-text ri-badge-${level}">${badgeText}</span>
             </a>`;
           }

@@ -293,11 +293,24 @@
     .related-inst-card .ri-badge-red { background: #7f1d1d; color: #fca5a5; }
     .related-inst-card .ri-badge-disconnected { background: #374151; color: #d1d5db; }
 
-    /* ── 右欄下拉式選單：儀器狀態項目（燈號 + 文字） ── */
+    /* ── 右欄下拉式選單：儀器狀態項目（燈號 + file_type + 文字） ── */
     .ri-status-item {
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+    .ri-status-ft {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 0.78rem;
+      color: #e2e8f0;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ri-status-text {
+      flex-shrink: 0;
     }
     .ri-light {
       display: inline-block;
