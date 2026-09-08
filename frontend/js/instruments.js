@@ -17,6 +17,56 @@ const DEPT_LABELS = {
 };
 const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
 
+/* ── 站碼→中文名稱對照表 ── */
+const STATION_NAME_MAP = {
+  // 雷達站
+  RCHL: '花蓮',
+  RCKT: '七股',
+  RCLY: '林園',
+  RCSL: '五分山',
+  RCNT: '南屯',
+  RCCK: '清泉崗（空軍）',
+  RCGR: '桃園（空軍）',
+  RCCG: '成功（空軍）',
+  RCWF: '五分山（另）',
+  RCMD: '墾丁（radman）',
+  // 空軍基地站
+  RCAY: '岡山（空軍）',
+  RCKU: '嘉義（空軍）',
+  RCNN: '台南（空軍）',
+  RCPO: '新竹（空軍）',
+  RCQS: '台東（空軍）',
+  RCYU: '花蓮（空軍）',
+  // 剖風儀雷達站
+  RCCL: '剖風儀 CL',
+  RCDS: '剖風儀 東沙',
+  // 高頻雷達
+  DS: '東沙',
+  HFradar_dt00: '大潭',
+  HFradar_ya01: '永安1',
+  HFradar_ya00: '永安',
+  HFradar_bg00: '北港',
+  HFradar_sl00: '沙崙',
+  HFradar_dj00: '東莒',
+  HFradar_gy00: '觀音',
+  // 衛星
+  HIMA: '向日葵9號',
+  GK2A: '千里眼2A',
+};
+
+/**
+ * 從 file_type 提取站碼並回傳中文名稱（若有對應）
+ * 優先以完整 file_type 匹配，再以 _ 前綴匹配
+ */
+function _getStationChinese(fileType) {
+  if (!fileType) return '';
+  // 完整匹配（如 HFradar_dt00）
+  if (STATION_NAME_MAP[fileType]) return STATION_NAME_MAP[fileType];
+  // 前綴匹配（如 RCNT_rb5 → RCNT）
+  const prefix = fileType.split('_')[0];
+  return STATION_NAME_MAP[prefix] || '';
+}
+
 function _pad(n) { return String(n).padStart(2, '0'); }
 function _formatDatetime(d) {
   return `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())} ` +
@@ -54,33 +104,26 @@ function _makeCard(inst) {
   const diff = inst.diff_time_minutes;
   const level = _alertClass(diff, inst);
   const isDisconnected = level === 'disconnected';
-  const isAlert = level !== 'ok' && !isDisconnected;
 
-  let diffDisplay, statusBadge;
+  // 延遲時間文字
+  let diffText;
   if (isDisconnected) {
-    diffDisplay = '<span class="diff-disconnected">斷線</span>';
-    statusBadge = '<span class="badge-disconnected">⚠ 斷線</span>';
+    diffText = '斷線';
   } else {
-    const diffText = diff != null ? diff.toFixed(1) + ' 分鐘' : 'N/A';
-    diffDisplay = `<span class="diff-time diff-${level}">${diffText}</span>`;
-    if (isAlert) {
-      statusBadge = `<span class="badge-${level}">⚠ 缺資料警示</span>`;
-    } else {
-      statusBadge = '<span class="ok-label">✓ 正常</span>';
-    }
+    diffText = diff != null ? diff.toFixed(1) + ' 分鐘' : 'N/A';
   }
-
-  const triggeredAt = (!isDisconnected && isAlert && inst.latest_file_time)
-    ? `<div class="triggered-at">最新資料：${new Date(inst.latest_file_time).toLocaleString('zh-TW')}</div>`
-    : '';
 
   const fileType = inst.file_type || '';
   const ip = inst.ip || '';
   const equipmentName = inst.equipment_name || '';
+  const chineseName = _getStationChinese(fileType);
 
   const historyUrl = '/history.html?file_type=' + encodeURIComponent(fileType) +
     '&ip=' + encodeURIComponent(ip) +
     '&name=' + encodeURIComponent(equipmentName);
+
+  // 中文站名（若有對應）
+  const displayName = chineseName || (equipmentName || '--');
 
   return `
     <div class="instrument-card level-${level}"
@@ -89,12 +132,14 @@ function _makeCard(inst) {
          data-ip="${ip}"
          data-equipment-name="${equipmentName}"
          onclick="window.location.href='${historyUrl}'">
-      <div class="card-meta">${inst.ip || '--'}</div>
-      <div class="card-title">${inst.file_type}</div>
-      <div class="card-name">${inst.equipment_name || '--'}</div>
-      <div style="margin:6px 0">${diffDisplay}</div>
-      ${statusBadge}
-      ${triggeredAt}
+      <div class="light-card-row">
+        <span class="status-light status-light-${level}"></span>
+        <div class="light-card-body">
+          <div class="card-station">${displayName}</div>
+          <div class="card-title">${fileType || '--'}</div>
+          <div class="light-card-diff diff-${level}">${diffText}</div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -110,6 +155,27 @@ function _isDisconnected(inst) {
 
 function _isAbnormal(inst) {
   return !_isNormal(inst) && !_isDisconnected(inst);
+}
+
+/**
+ * 相同中文名稱的異常儀器只保留延遲時間最大的一筆。
+ * 無對應中文名稱者以 file_type + ip 作為唯一 key，不會被合併。
+ */
+function _dedupeByChineseName(instruments) {
+  const sorted = [...instruments].sort(
+    (a, b) => (b.diff_time_minutes ?? 0) - (a.diff_time_minutes ?? 0)
+  );
+  const seen = new Set();
+  const result = [];
+  for (const inst of sorted) {
+    const chineseName = _getStationChinese(inst.file_type || '');
+    const key = chineseName || `${inst.file_type || ''}_${inst.ip || ''}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(inst);
+    }
+  }
+  return result;
 }
 
 function _renderInstruments(instruments) {
@@ -151,8 +217,12 @@ function _renderInstruments(instruments) {
     const total = groupInsts.length;
 
     const normalInsts       = groupInsts.filter(_isNormal);
-    const abnormalInsts     = groupInsts.filter(_isAbnormal);
+    const abnormalInstsRaw  = groupInsts.filter(_isAbnormal);
     const disconnectedInsts = groupInsts.filter(_isDisconnected);
+
+    // 異常儀器：相同中文名稱只保留延遲最大的一筆
+    const abnormalInsts     = _dedupeByChineseName(abnormalInstsRaw);
+
     const normalCount       = normalInsts.length;
     const abnormalCount     = abnormalInsts.length;
     const disconnectedCount = disconnectedInsts.length;
