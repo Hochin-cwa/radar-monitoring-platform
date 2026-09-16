@@ -21,15 +21,15 @@ const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
 const STATION_NAME_MAP = {
   // 雷達站
   RCHL: '花蓮',
-  RCKT: '七股',
+  RCKT: '墾丁',
   RCLY: '林園',
   RCSL: '五分山',
   RCNT: '南屯',
   RCCK: '清泉崗（空軍）',
   RCGR: '桃園（空軍）',
-  RCCG: '成功（空軍）',
-  RCWF: '五分山（另）',
-  RCMD: '墾丁（radman）',
+  RCCG: '七股',
+  RCWF: '五分山',
+  RCMD: '五分山（另）',
   // 空軍基地站
   RCAY: '岡山（空軍）',
   RCKU: '嘉義（空軍）',
