@@ -112,14 +112,17 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     timeout = get_config().system.query_timeout_seconds
     t_yellow, t_orange, t_red = get_instrument_thresholds(file_type)
 
-    # FileTime 為 Unix timestamp（秒，UTC 基準）。
-    # 不使用 SQL 端的 FROM_UNIXTIME：它會把 epoch 轉成「DB session 時區」的
-    # 牆上時間（UTC+8），之後若在 Python 端再標記為 UTC，等於把 +8 位移套了兩次，
-    # 前端以本地時間渲染時就會多出 8 小時、時間跑到未來。
-    # 改為取原始 epoch，於 Python 端用 fromtimestamp(..., tz=UTC) 轉成正確的 UTC 瞬間，
-    # 與 alert_service 的作法一致。
+    # FileTime 為 Unix timestamp（秒）。以 FROM_UNIXTIME 在 DB session 時區
+    # （本平台部署於台灣，UTC+8）轉成「牆上時間」，讓圖表上的時間與運維人員
+    # 直接查資料庫看到的 FROM_UNIXTIME 值完全一致（例如最新一筆 11:48:16）。
+    #
+    # 關鍵：回傳時「不可」再標記成 UTC（+00:00）。若標記為 UTC，瀏覽器（UTC+8）
+    # 會再加 8 小時而超出現在時間；反之若直接送 UTC epoch 再靠瀏覽器 +8，
+    # 又會依觀看者時區而異、在非 UTC+8 環境少 8 小時。
+    # 因此一律輸出「無時區後綴的本地牆上時間字串」，瀏覽器 new Date() 以自身
+    # 本地時區解讀，顯示出的時分與 DB 一致。
     sql = text(f"""
-        SELECT FileTime, DiffTime
+        SELECT FROM_UNIXTIME(FileTime) AS Time, DiffTime
         FROM {table}
         WHERE IP = :ip
           AND FileType = :file_type
@@ -139,11 +142,16 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 
     data = []
     for row in rows:
-        if row.FileTime is None:
+        if row.Time is None:
             continue
-        # FileTime 是 Unix epoch（秒，UTC）。直接轉成 UTC 感知的 datetime，
-        # ISO 字串會帶 +00:00，前端 new Date() 再依瀏覽器本地時區正確顯示。
-        t_iso = datetime.fromtimestamp(float(row.FileTime), tz=timezone.utc).isoformat()
+        t = row.Time
+        # FROM_UNIXTIME 回傳的是 DB session 時區（UTC+8）的牆上時間，且為 naive
+        # （不帶 tzinfo）。輸出無時區後綴的 ISO 字串，讓前端以本地時區解讀，
+        # 顯示的時分與 DB 直查一致，且不會被再次加上 8 小時。
+        if isinstance(t, datetime):
+            t_iso = t.replace(tzinfo=None).isoformat()
+        else:
+            t_iso = str(t)
         data.append({
             "time": t_iso,
             # DiffTime 欄位單位為秒，換算成分鐘後回傳
