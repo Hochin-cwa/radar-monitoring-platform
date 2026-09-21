@@ -112,9 +112,14 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     timeout = get_config().system.query_timeout_seconds
     t_yellow, t_orange, t_red = get_instrument_thresholds(file_type)
 
-    # FileTime 為 Unix timestamp（秒），直接在 SQL 端以 FROM_UNIXTIME 轉成 datetime。
+    # FileTime 為 Unix timestamp（秒，UTC 基準）。
+    # 不使用 SQL 端的 FROM_UNIXTIME：它會把 epoch 轉成「DB session 時區」的
+    # 牆上時間（UTC+8），之後若在 Python 端再標記為 UTC，等於把 +8 位移套了兩次，
+    # 前端以本地時間渲染時就會多出 8 小時、時間跑到未來。
+    # 改為取原始 epoch，於 Python 端用 fromtimestamp(..., tz=UTC) 轉成正確的 UTC 瞬間，
+    # 與 alert_service 的作法一致。
     sql = text(f"""
-        SELECT FROM_UNIXTIME(FileTime) AS Time, DiffTime
+        SELECT FileTime, DiffTime
         FROM {table}
         WHERE IP = :ip
           AND FileType = :file_type
@@ -134,13 +139,11 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
 
     data = []
     for row in rows:
-        if row.Time is None:
+        if row.FileTime is None:
             continue
-        t = row.Time
-        if isinstance(t, datetime):
-            t_iso = t.replace(tzinfo=timezone.utc).isoformat() if t.tzinfo is None else t.isoformat()
-        else:
-            t_iso = str(t)
+        # FileTime 是 Unix epoch（秒，UTC）。直接轉成 UTC 感知的 datetime，
+        # ISO 字串會帶 +00:00，前端 new Date() 再依瀏覽器本地時區正確顯示。
+        t_iso = datetime.fromtimestamp(float(row.FileTime), tz=timezone.utc).isoformat()
         data.append({
             "time": t_iso,
             # DiffTime 欄位單位為秒，換算成分鐘後回傳
