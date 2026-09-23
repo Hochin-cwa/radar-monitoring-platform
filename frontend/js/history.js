@@ -810,10 +810,9 @@
           const groupItems = groups[key] || [];
           if (groupItems.length === 0) continue;
           const label = TYPE_LABELS[key];
-          // 目前檢視的儀器所屬類型預設展開
-          const containsCurrent = groupItems.some(inst => inst.file_type === FILE_TYPE);
-          html += `<button class="dept-toggle-btn${containsCurrent ? ' expanded' : ''}" data-type-key="${key}">${label}</button>`;
-          html += `<div class="dept-computer-list${containsCurrent ? ' show' : ''}" data-type-list="${key}">`;
+          // 所有類型下拉一律預設展開，直接看到所有相關儀器
+          html += `<button class="dept-toggle-btn expanded" data-type-key="${key}">${label}</button>`;
+          html += `<div class="dept-computer-list show" data-type-list="${key}">`;
           for (const inst of groupItems) {
             const { level, badgeText } = _instrumentLevel(inst);
             const isActive = inst.file_type === FILE_TYPE;
