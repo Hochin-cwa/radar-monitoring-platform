@@ -23,7 +23,7 @@ const STATION_NAME_MAP = {
   RCHL: '花蓮',
   RCKT: '墾丁',
   RCLY: '林園',
-  RCSL: '五分山',
+  RCSL: '樹林',
   RCNT: '南屯',
   RCCK: '清泉崗（空軍）',
   RCGR: '桃園（空軍）',
@@ -38,7 +38,7 @@ const STATION_NAME_MAP = {
   RCQS: '台東（空軍）',
   RCYU: '花蓮（空軍）',
   // 剖風儀雷達站
-  RCCL: '剖風儀 CL',
+  RCCL: '剖風儀 中壢',
   RCDS: '剖風儀 東沙',
   // 高頻雷達
   DS: '東沙',
@@ -51,7 +51,7 @@ const STATION_NAME_MAP = {
   HFradar_gy00: '觀音',
   // 衛星
   HIMA: '向日葵9號',
-  GK2A: '千里眼2A',
+  GK2A: 'GK2A',
 };
 
 /**
