@@ -198,15 +198,12 @@
   // 所有系統圖（CPU/記憶體/磁碟）折線統一使用橘色。
   const SYS_ORANGE = 'rgb(251,146,60)';
   const SYS_ORANGE_FILL = 'rgba(251,146,60,0.08)';
-  // 合併圖用的兩種橘色濃淡：淺橘（Load_5）與深橘（Load_15）
-  const SYS_ORANGE_LIGHT = 'rgb(253,186,116)';
-  const SYS_ORANGE_DARK = 'rgb(234,88,12)';
 
-  // 系統圖 y 軸固定 0%–100%，以 baseChartOptions 為基礎再鎖定範圍。
-  function systemChartOptions(yLabel) {
+  // 系統圖 y 軸預設固定 0%–100%，可傳入 yMax 覆寫上限（例如 CPU 負載用 0%–10%）。
+  function systemChartOptions(yLabel, yMax = 100) {
     const options = baseChartOptions(yLabel);
     options.scales.y.min = 0;
-    options.scales.y.max = 100;
+    options.scales.y.max = yMax;
     return options;
   }
 
@@ -214,7 +211,7 @@
   // chartInstances stores { canvasId: Chart instance }
   const _chartInstances = {};
 
-  function renderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color) {
+  function renderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color, yMax = 100) {
     const noDataEl = document.getElementById(noDataId);
     const canvas = document.getElementById(canvasId);
     if (!canvas || !noDataEl) return;
@@ -249,75 +246,13 @@
 
     if (_chartInstances[canvasId]) {
       _chartInstances[canvasId].data.datasets = [dataset];
-      _chartInstances[canvasId].options = systemChartOptions(yLabel);
+      _chartInstances[canvasId].options = systemChartOptions(yLabel, yMax);
       _chartInstances[canvasId].update('none');
     } else {
       _chartInstances[canvasId] = new Chart(canvas, {
         type: 'line',
         data: { datasets: [dataset] },
-        options: systemChartOptions(yLabel),
-      });
-    }
-  }
-
-  /**
-   * 在同一張圖表上畫多條折線（用於合併 Load_5 與 Load_15）。
-   * series: [{ valueKey, label, dash }]，全部使用橘色，以實線／虛線區分。
-   */
-  function renderMultiLineChart(canvasId, noDataId, data, yLabel, series) {
-    const noDataEl = document.getElementById(noDataId);
-    const canvas = document.getElementById(canvasId);
-    if (!canvas || !noDataEl) return;
-
-    const arr = Array.isArray(data) ? data : [];
-    const datasets = [];
-    let hasAny = false;
-
-    for (const s of series) {
-      const points = arr
-        .map(d => ({ x: new Date(d.time).getTime(), y: d[s.valueKey] }))
-        .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
-        .sort((a, b) => a.x - b.x);
-      if (points.length > 0) hasAny = true;
-      const seriesColor = s.color || SYS_ORANGE;
-      datasets.push({
-        label: s.label,
-        data: points,
-        borderColor: seriesColor,
-        backgroundColor: seriesColor,
-        borderWidth: 1.5,
-        pointRadius: 0,
-        fill: false,
-        tension: 0.2,
-      });
-    }
-
-    if (!hasAny) {
-      noDataEl.classList.remove('hidden');
-      canvas.style.display = 'none';
-      if (_chartInstances[canvasId]) { _chartInstances[canvasId].destroy(); delete _chartInstances[canvasId]; }
-      return;
-    }
-
-    noDataEl.classList.add('hidden');
-    canvas.style.display = '';
-
-    const options = systemChartOptions(yLabel);
-    // 合併圖有多條線，顯示圖例以區分實線／虛線
-    options.plugins.legend = {
-      display: true,
-      labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 20 },
-    };
-
-    if (_chartInstances[canvasId]) {
-      _chartInstances[canvasId].data.datasets = datasets;
-      _chartInstances[canvasId].options = options;
-      _chartInstances[canvasId].update('none');
-    } else {
-      _chartInstances[canvasId] = new Chart(canvas, {
-        type: 'line',
-        data: { datasets },
-        options,
+        options: systemChartOptions(yLabel, yMax),
       });
     }
   }
@@ -348,21 +283,11 @@
     const cpuData = Array.isArray(sysData.cpu) ? sysData.cpu : [];
     const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
 
-    // 卡片定義：single = 單線圖；multi = 合併多線圖（Load_5 + Load_15）
+    // 卡片定義：single = 單線圖
+    // CPU 負載 5m / 15m 分別為獨立圖表，Y 軸範圍 0%–10%
     const cpuMemCards = [
-      { type: 'single', title: 'CPU 負載 1m（Load_1）', canvasId: 'chart-cpu-load_1', noDataId: 'nodata-cpu-load_1', data: cpuData, valueKey: 'load_1', yLabel: 'Load_1' },
-      {
-        type: 'multi',
-        title: 'CPU 負載 5m / 15m（Load_5 / Load_15）',
-        canvasId: 'chart-cpu-load_5_15',
-        noDataId: 'nodata-cpu-load_5_15',
-        data: cpuData,
-        yLabel: 'Load',
-        series: [
-          { valueKey: 'load_5', label: 'Load_5', color: SYS_ORANGE_LIGHT },
-          { valueKey: 'load_15', label: 'Load_15', color: SYS_ORANGE_DARK },
-        ],
-      },
+      { type: 'single', title: 'CPU 負載 5m（Load_5）', canvasId: 'chart-cpu-load_5', noDataId: 'nodata-cpu-load_5', data: cpuData, valueKey: 'load_5', yLabel: 'Load_5', yMax: 10 },
+      { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'chart-cpu-load_15', noDataId: 'nodata-cpu-load_15', data: cpuData, valueKey: 'load_15', yLabel: 'Load_15', yMax: 10 },
       { type: 'single', title: '記憶體使用率（MemoryUSE %）', canvasId: 'chart-memory', noDataId: 'nodata-memory', data: memData, valueKey: 'memory_use', yLabel: 'MemoryUSE %' },
     ];
 
@@ -378,11 +303,7 @@
       `).join('');
 
       for (const c of cpuMemCards) {
-        if (c.type === 'multi') {
-          renderMultiLineChart(c.canvasId, c.noDataId, c.data, c.yLabel, c.series);
-        } else {
-          renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
-        }
+        renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color, c.yMax);
       }
     }
 
@@ -518,7 +439,7 @@
 
     const _compChartInstances = {};
 
-    function compRenderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color) {
+    function compRenderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color, yMax = 100) {
       const noDataEl = document.getElementById(noDataId);
       const canvas = document.getElementById(canvasId);
       if (!canvas || !noDataEl) return;
@@ -550,7 +471,7 @@
         tension: 0.2,
       };
 
-      const options = systemChartOptions(yLabel);
+      const options = systemChartOptions(yLabel, yMax);
 
       if (_compChartInstances[canvasId]) {
         _compChartInstances[canvasId].data.datasets = [dataset];
@@ -560,63 +481,6 @@
         _compChartInstances[canvasId] = new Chart(canvas, {
           type: 'line',
           data: { datasets: [dataset] },
-          options,
-        });
-      }
-    }
-
-    // 電腦模式：同一張圖畫多條折線（合併 Load_5 / Load_15），統一橘色以實線／虛線區分
-    function compRenderMultiLineChart(canvasId, noDataId, data, yLabel, series) {
-      const noDataEl = document.getElementById(noDataId);
-      const canvas = document.getElementById(canvasId);
-      if (!canvas || !noDataEl) return;
-
-      const arr = Array.isArray(data) ? data : [];
-      const datasets = [];
-      let hasAny = false;
-      for (const s of series) {
-        const points = arr
-          .map(d => ({ x: new Date(d.time).getTime(), y: d[s.valueKey] }))
-          .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
-          .sort((a, b) => a.x - b.x);
-        if (points.length > 0) hasAny = true;
-        const seriesColor = s.color || SYS_ORANGE;
-        datasets.push({
-          label: s.label,
-          data: points,
-          borderColor: seriesColor,
-          backgroundColor: seriesColor,
-          borderWidth: 1.5,
-          pointRadius: 0,
-          fill: false,
-          tension: 0.2,
-        });
-      }
-
-      if (!hasAny) {
-        noDataEl.classList.remove('hidden');
-        canvas.style.display = 'none';
-        if (_compChartInstances[canvasId]) { _compChartInstances[canvasId].destroy(); delete _compChartInstances[canvasId]; }
-        return;
-      }
-
-      noDataEl.classList.add('hidden');
-      canvas.style.display = '';
-
-      const options = systemChartOptions(yLabel);
-      options.plugins.legend = {
-        display: true,
-        labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 20 },
-      };
-
-      if (_compChartInstances[canvasId]) {
-        _compChartInstances[canvasId].data.datasets = datasets;
-        _compChartInstances[canvasId].options = options;
-        _compChartInstances[canvasId].update('none');
-      } else {
-        _compChartInstances[canvasId] = new Chart(canvas, {
-          type: 'line',
-          data: { datasets },
           options,
         });
       }
@@ -632,22 +496,12 @@
       });
 
       // CPU + Memory
+      // CPU 負載 5m / 15m 分別為獨立圖表，Y 軸範圍 0%–10%
       const cpuData = Array.isArray(sysData.cpu) ? sysData.cpu : [];
       const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
       const cpuMemCards = [
-        { type: 'single', title: 'CPU 負載 1m（Load_1）', canvasId: 'comp-chart-cpu-load_1', noDataId: 'comp-nodata-cpu-load_1', data: cpuData, valueKey: 'load_1', yLabel: 'Load_1' },
-        {
-          type: 'multi',
-          title: 'CPU 負載 5m / 15m（Load_5 / Load_15）',
-          canvasId: 'comp-chart-cpu-load_5_15',
-          noDataId: 'comp-nodata-cpu-load_5_15',
-          data: cpuData,
-          yLabel: 'Load',
-          series: [
-            { valueKey: 'load_5', label: 'Load_5', color: SYS_ORANGE_LIGHT },
-            { valueKey: 'load_15', label: 'Load_15', color: SYS_ORANGE_DARK },
-          ],
-        },
+        { type: 'single', title: 'CPU 負載 5m（Load_5）', canvasId: 'comp-chart-cpu-load_5', noDataId: 'comp-nodata-cpu-load_5', data: cpuData, valueKey: 'load_5', yLabel: 'Load_5', yMax: 10 },
+        { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'comp-chart-cpu-load_15', noDataId: 'comp-nodata-cpu-load_15', data: cpuData, valueKey: 'load_15', yLabel: 'Load_15', yMax: 10 },
         { type: 'single', title: '記憶體使用率（MemoryUSE %）', canvasId: 'comp-chart-memory', noDataId: 'comp-nodata-memory', data: memData, valueKey: 'memory_use', yLabel: 'MemoryUSE %' },
       ];
 
@@ -662,11 +516,7 @@
           </div>
         `).join('');
         for (const c of cpuMemCards) {
-          if (c.type === 'multi') {
-            compRenderMultiLineChart(c.canvasId, c.noDataId, c.data, c.yLabel, c.series);
-          } else {
-            compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
-          }
+          compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color, c.yMax);
         }
       }
 
