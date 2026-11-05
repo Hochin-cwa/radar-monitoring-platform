@@ -1,9 +1,7 @@
 /**
  * history.js — 儀器歷史資料頁面控制器
- * 讀取 URL query string: file_type, ip, name
  * 繪製 DiffTime 時序折線圖（含三條閾值水平線）
- * 繪製 CPU / 記憶體 / 磁碟三張時序圖
- * 支援 6h / 1d / 1w / 1m / 3m 時間範圍切換
+ * 繪製 CPU / 記憶體 / 磁碟三張時序圖，支援多種時間範圍切換。
  */
 
 (function () {

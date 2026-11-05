@@ -4,4 +4,4 @@ if ps -ef |grep backend |grep monitor|grep -v grep ;then
 fi
 cd ../
 echo $PWD
-nohup uvicorn backend.main:app --host 0.0.0.0 --port 8000 > logs/uvicorn.log 2>&1 &
+nohup uvicorn backend.main:app --host 0.0.0.0 --port 8000 --no-server-header > logs/uvicorn.log 2>&1 &
