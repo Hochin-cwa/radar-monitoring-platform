@@ -3,7 +3,6 @@ History service — queries instrument and system history from MySQL databases.
 """
 from __future__ import annotations
 
-import html
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -15,6 +14,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from backend.config import get_config
 from backend.database import get_session
 from backend.services.alert_service import get_instrument_thresholds
+from backend.services.log_safe import sanitize_log
 
 logger = logging.getLogger("history_service")
 
@@ -138,7 +138,7 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
                 {"ip": ip, "file_type": file_type, "start_ts": start_ts},
             ).fetchall()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_instrument_history: DB error: %s", exc)
+        logger.error("get_instrument_history: DB error: %s", sanitize_log(exc))
         rows = []
 
     data = []
@@ -195,7 +195,7 @@ def get_system_history(ip: str, range: str) -> dict:
 
     logger.info(
         "get_system_history: ip=%s, range=%s, start_dt=%s",
-        ip, range, start_dt.isoformat(),
+        sanitize_log(ip), sanitize_log(range), start_dt.isoformat(),
     )
 
     _SYS_SQL = text("""
@@ -224,7 +224,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 _SYS_SQL.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
-        logger.info("get_system_history (system_status): %d rows for ip=%s", len(rows), ip)
+        logger.info("get_system_history (system_status): %d rows for ip=%s", len(rows), sanitize_log(ip))
 
         for row in rows:
             t_iso = _server_time_iso(row.ServerTime)
@@ -241,7 +241,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 "memory_use": float(row.MemoryUSE) if row.MemoryUSE is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_system_history (system_status): DB error: %s", exc)
+        logger.error("get_system_history (system_status): DB error: %s", sanitize_log(exc))
 
     try:
         with get_session("disk_status") as session:
@@ -249,7 +249,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 _DISK_SQL.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
-        logger.info("get_system_history (disk_status): %d rows for ip=%s", len(rows), ip)
+        logger.info("get_system_history (disk_status): %d rows for ip=%s", len(rows), sanitize_log(ip))
 
         for row in rows:
             t_iso = _server_time_iso(row.ServerTime)
@@ -261,7 +261,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 "used": float(row.Used) if row.Used is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_system_history (disk_status): DB error: %s", exc)
+        logger.error("get_system_history (disk_status): DB error: %s", sanitize_log(exc))
 
     return {
         "ip": ip,
@@ -283,14 +283,10 @@ def get_environment_history(ip: str, range: str) -> dict:
     start_dt = _parse_range(range)
     start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     timeout = get_config().system.query_timeout_seconds
-    ip = html.escape(ip)
-    ip = ip.replace('\r\n', '').replace('\n', '')
-    range = html.escape(range)
-    range = range.replace('\r\n', '').replace('\n', '')
 
     logger.info(
         "get_environment_history: ip=%s, range=%s, start_str=%s",
-        ip, range, start_str,
+        sanitize_log(ip), sanitize_log(range), start_str,
     )
 
     temperature_data: list[dict] = []
@@ -311,7 +307,7 @@ def get_environment_history(ip: str, range: str) -> dict:
             ).fetchall()
 
         logger.info(
-            "get_environment_history: got %d rows for ip=%s", len(rows), ip,
+            "get_environment_history: got %d rows for ip=%s", len(rows), sanitize_log(ip),
         )
 
         for row in rows:
@@ -334,9 +330,9 @@ def get_environment_history(ip: str, range: str) -> dict:
                 "value": float(row.humidity) if row.humidity is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_environment_history: DB error: %s", exc)
+        logger.error("get_environment_history: DB error: %s", sanitize_log(exc))
     except Exception as exc:
-        logger.error("get_environment_history: unexpected error: %s", exc)
+        logger.error("get_environment_history: unexpected error: %s", sanitize_log(exc))
 
     return {
         "ip": ip,
