@@ -208,8 +208,15 @@
   // ── 建立或更新系統圖（通用） ──────────────────────────────
   // chartInstances stores { canvasId: Chart instance }
   const _chartInstances = {};
+  // 圖表資料欄位對照(集中管理,避免在卡片定義中散落字串常值)
+  const METRIC_FIELDS = Object.freeze({
+    cpuLoad5:  'load_5',
+    cpuLoad15: 'load_15',
+    memory:    'memory_use',
+    diskUsed:  'used',
+  });
 
-  function renderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color, yMax = 100) {
+  function renderSingleChart(canvasId, noDataId, data, field, yLabel, color, yMax = 100) {
     const noDataEl = document.getElementById(noDataId);
     const canvas = document.getElementById(canvasId);
     if (!canvas || !noDataEl) return;
@@ -217,7 +224,7 @@
     // Ensure data is an array
     const arr = Array.isArray(data) ? data : [];
     const points = arr
-      .map(d => ({ x: new Date(d.time).getTime(), y: d[valueKey] }))
+      .map(d => ({ x: new Date(d.time).getTime(), y: d[field] }))
       .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
       .sort((a, b) => a.x - b.x);
 
@@ -283,10 +290,11 @@
 
     // 卡片定義：single = 單線圖
     // CPU 負載 5m / 15m 分別為獨立圖表，Y 軸範圍 0%–10%
+    
     const cpuMemCards = [
-      { type: 'single', title: 'CPU 負載 5m（Load_5）', canvasId: 'chart-cpu-load_5', noDataId: 'nodata-cpu-load_5', data: cpuData, valueKey: 'load_5', yLabel: 'Load_5', yMax: 10 },
-      { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'chart-cpu-load_15', noDataId: 'nodata-cpu-load_15', data: cpuData, valueKey: 'load_15', yLabel: 'Load_15', yMax: 10 },
-      { type: 'single', title: '記憶體使用率（MemoryUSE %）', canvasId: 'chart-memory', noDataId: 'nodata-memory', data: memData, valueKey: 'memory_use', yLabel: 'MemoryUSE %' },
+      { type: 'single', title: 'CPU 負載 5m（Load_5）',   canvasId: 'chart-cpu-load_5',  noDataId: 'nodata-cpu-load_5',  data: cpuData, field: METRIC_FIELDS.cpuLoad5,  yLabel: 'Load_5',  yMax: 10 },
+      { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'chart-cpu-load_15', noDataId: 'nodata-cpu-load_15', data: cpuData, field: METRIC_FIELDS.cpuLoad15, yLabel: 'Load_15', yMax: 10 },
+      { type: 'single', title: '記憶體使用率（Memory %）', canvasId: 'chart-memory',      noDataId: 'nodata-memory',      data: memData, field: METRIC_FIELDS.memory,    yLabel: 'Memory %' },
     ];
 
     if (cpuMemGrid) {
@@ -301,7 +309,7 @@
       `).join('');
 
       for (const c of cpuMemCards) {
-        renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color, c.yMax);
+        renderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color, c.yMax);
       }
     }
 
@@ -324,7 +332,7 @@
         canvasId,
         noDataId,
         data: diskDataObj[fsPath],
-        valueKey: 'used',
+        field: METRIC_FIELDS.diskUsed,
         yLabel: 'Used %',
         color: 'rgb(251,146,60)',
       });
@@ -336,7 +344,7 @@
         canvasId: 'chart-disk-empty',
         noDataId: 'nodata-disk-empty',
         data: [],
-        valueKey: 'used',
+        field: METRIC_FIELDS.diskUsed,
         yLabel: 'Used %',
         color: 'rgb(251,146,60)',
       });
@@ -354,7 +362,7 @@
       `).join('');
 
       for (const c of diskCards) {
-        renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+        renderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color);
       }
     }
   }
@@ -437,14 +445,14 @@
 
     const _compChartInstances = {};
 
-    function compRenderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color, yMax = 100) {
+    function compRenderSingleChart(canvasId, noDataId, data, field, yLabel, color, yMax = 100) {
       const noDataEl = document.getElementById(noDataId);
       const canvas = document.getElementById(canvasId);
       if (!canvas || !noDataEl) return;
 
       const arr = Array.isArray(data) ? data : [];
       const points = arr
-        .map(d => ({ x: new Date(d.time).getTime(), y: d[valueKey] }))
+        .map(d => ({ x: new Date(d.time).getTime(), y: d[field] }))
         .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
         .sort((a, b) => a.x - b.x);
 
@@ -497,10 +505,11 @@
       // CPU 負載 5m / 15m 分別為獨立圖表，Y 軸範圍 0%–10%
       const cpuData = Array.isArray(sysData.cpu) ? sysData.cpu : [];
       const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
+
       const cpuMemCards = [
-        { type: 'single', title: 'CPU 負載 5m（Load_5）', canvasId: 'comp-chart-cpu-load_5', noDataId: 'comp-nodata-cpu-load_5', data: cpuData, valueKey: 'load_5', yLabel: 'Load_5', yMax: 10 },
-        { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'comp-chart-cpu-load_15', noDataId: 'comp-nodata-cpu-load_15', data: cpuData, valueKey: 'load_15', yLabel: 'Load_15', yMax: 10 },
-        { type: 'single', title: '記憶體使用率（MemoryUSE %）', canvasId: 'comp-chart-memory', noDataId: 'comp-nodata-memory', data: memData, valueKey: 'memory_use', yLabel: 'MemoryUSE %' },
+        { type: 'single', title: 'CPU 負載 5m（Load_5）',   canvasId: 'chart-cpu-load_5',  noDataId: 'nodata-cpu-load_5',  data: cpuData, field: METRIC_FIELDS.cpuLoad5,  yLabel: 'Load_5',  yMax: 10 },
+        { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'chart-cpu-load_15', noDataId: 'nodata-cpu-load_15', data: cpuData, field: METRIC_FIELDS.cpuLoad15, yLabel: 'Load_15', yMax: 10 },
+        { type: 'single', title: '記憶體使用率（Memory %）', canvasId: 'chart-memory',      noDataId: 'nodata-memory',      data: memData, field: METRIC_FIELDS.memory,    yLabel: 'Memory %' },
       ];
 
       if (cpuMemGrid) {
@@ -514,7 +523,7 @@
           </div>
         `).join('');
         for (const c of cpuMemCards) {
-          compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color, c.yMax);
+          compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color, c.yMax);
         }
       }
 
@@ -528,10 +537,10 @@
       const diskPaths = Object.keys(diskDataObj).sort();
       for (const fsPath of diskPaths) {
         const safeId = fsPath.replace(/[^a-zA-Z0-9]/g, '_');
-        diskCards.push({ title: `磁碟 ${fsPath}（Used %）`, canvasId: `comp-chart-disk-${safeId}`, noDataId: `comp-nodata-disk-${safeId}`, data: diskDataObj[fsPath], valueKey: 'used', yLabel: 'Used %', color: 'rgb(251,146,60)' });
+        diskCards.push({ title: `磁碟 ${fsPath}（Used %）`, canvasId: `comp-chart-disk-${safeId}`, noDataId: `comp-nodata-disk-${safeId}`, data: diskDataObj[fsPath], field: METRIC_FIELDS.diskUsed, yLabel: 'Used %', color: 'rgb(251,146,60)' });
       }
       if (diskPaths.length === 0) {
-        diskCards.push({ title: '磁碟使用率', canvasId: 'comp-chart-disk-empty', noDataId: 'comp-nodata-disk-empty', data: [], valueKey: 'used', yLabel: 'Used %', color: 'rgb(251,146,60)' });
+        diskCards.push({ title: '磁碟使用率', canvasId: 'comp-chart-disk-empty', noDataId: 'comp-nodata-disk-empty', data: [], field: METRIC_FIELDS.diskUsed, yLabel: 'Used %', color: 'rgb(251,146,60)' });
       }
       if (diskGrid) {
         diskGrid.innerHTML = diskCards.map(c => `
@@ -543,7 +552,7 @@
             </div>
           </div>
         `).join('');
-        for (const c of diskCards) compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+        for (const c of diskCards) compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color);
       }
     }
 

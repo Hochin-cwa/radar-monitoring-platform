@@ -3,6 +3,7 @@ History service — queries instrument and system history from MySQL databases.
 """
 from __future__ import annotations
 
+import html
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -282,6 +283,10 @@ def get_environment_history(ip: str, range: str) -> dict:
     start_dt = _parse_range(range)
     start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     timeout = get_config().system.query_timeout_seconds
+    ip = html.escape(ip)
+    ip = ip.replace('\r\n', '').replace('\n', '')
+    range = html.escape(range)
+    range = range.replace('\r\n', '').replace('\n', '')
 
     logger.info(
         "get_environment_history: ip=%s, range=%s, start_str=%s",
