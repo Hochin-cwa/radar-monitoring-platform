@@ -293,6 +293,50 @@
     .related-inst-card .ri-badge-red { background: #7f1d1d; color: #fca5a5; }
     .related-inst-card .ri-badge-disconnected { background: #374151; color: #d1d5db; }
 
+    /* ── 右欄下拉式選單：儀器狀態項目（燈號 + file_type + 文字） ── */
+    .ri-status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ri-status-ft {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 0.78rem;
+      color: #e2e8f0;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ri-status-text {
+      flex-shrink: 0;
+    }
+    .ri-light {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 4px currentColor;
+    }
+    .ri-light-ok { background: #4ade80; color: #4ade80; }
+    .ri-light-yellow { background: #facc15; color: #facc15; }
+    .ri-light-orange { background: #fb923c; color: #fb923c; }
+    .ri-light-red { background: #ef4444; color: #ef4444; }
+    .ri-light-disconnected { background: #9ca3af; color: #9ca3af; box-shadow: none; }
+    .ri-status-text {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .ri-status-text.ri-badge-ok { background: #166534; color: #bbf7d0; }
+    .ri-status-text.ri-badge-yellow { background: #854d0e; color: #fef08a; }
+    .ri-status-text.ri-badge-orange { background: #9a3412; color: #fed7aa; }
+    .ri-status-text.ri-badge-red { background: #7f1d1d; color: #fca5a5; }
+    .ri-status-text.ri-badge-disconnected { background: #374151; color: #d1d5db; }
+
     /* Responsive for 4K */
     @media (min-width: 2560px) {
       .chart-wrapper { height: 400px; }
@@ -321,7 +365,6 @@
       <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
     </div>
     <nav class="header-nav">
-      <a href="/index.html" class="global-nav-link">首頁</a>
       <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
       <a href="/computers.html" class="global-nav-link active">電腦即時狀況</a>
       <a href="/settings.html" class="global-nav-link">閾值設定</a>
@@ -416,14 +459,18 @@
     <!-- 右欄：關聯儀器即時狀態 -->
     <aside class="col-right">
       <h3>相關儀器即時狀態</h3>
-      <div id="related-instruments-list" class="related-instruments-grid">
+      <div id="related-instruments-list">
         <p class="loading" style="font-size:0.8rem;color:#64748b;">載入中…</p>
       </div>
     </aside>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+          integrity="sha384-JUh163oCRItcbPme8pYnROHQMC6fNKTBWtRG3I3I0erJkzNgL7uxKlNwcrcFKeqF"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"
+          integrity="sha384-cVMg8E3QFwTvGCDuK+ET4PD341jF3W8nO1auiXfuZNQkzbUUiBGLsIQUE+b1mxws"
+          crossorigin="anonymous"></script>
   <script src="/js/api.js"></script>
   <script src="/js/history.js"></script>
 </body>

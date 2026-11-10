@@ -1,8 +1,6 @@
 /**
  * environment-history.js — 溫溼度計歷史資料頁面控制器
- * 讀取 URL query string: ip, name
- * 繪製溫度與濕度時序折線圖
- * 支援 6h / 1d / 1w / 1m / 3m 時間範圍切換
+ * 繪製溫度與濕度時序折線圖，支援多種時間範圍切換。
  */
 
 (function () {
