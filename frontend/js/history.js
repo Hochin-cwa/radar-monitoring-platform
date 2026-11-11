@@ -1,9 +1,7 @@
 /**
  * history.js — 儀器歷史資料頁面控制器
- * 讀取 URL query string: file_type, ip, name
  * 繪製 DiffTime 時序折線圖（含三條閾值水平線）
- * 繪製 CPU / 記憶體 / 磁碟三張時序圖
- * 支援 6h / 1d / 1w / 1m / 3m 時間範圍切換
+ * 繪製 CPU / 記憶體 / 磁碟三張時序圖，支援多種時間範圍切換。
  */
 
 (function () {
@@ -106,27 +104,32 @@
       if (_diffChart) { _diffChart.destroy(); _diffChart = null; }
       return;
     }
-    // y 軸以實際 diff_time_minutes 範圍為準（上下留 10% 邊界）。
-    // 否則閾值線（例如紅色 27 分）會把 7~8 分的資料壓成一條平線。
-    // 資料量可能上萬筆，用迴圈而非 Math.min(...arr) 避免超出參數上限。
-    let yMin = points[0].y;
-    let yMax = points[0].y;
-    for (const p of points) {
-      if (p.y < yMin) yMin = p.y;
-      if (p.y > yMax) yMax = p.y;
-    }
-    const pad = Math.max((yMax - yMin) * 0.1, 0.1);
-    const axisMin = Math.max(0, yMin - pad);
-    const axisMax = yMax + pad;
 
-    // 閾值水平線：以 borderDash 虛線 dataset 實作。
-    // 只有落在 y 軸範圍內的閾值才畫出來，圖例才會與實際線條一致。
     const tYellow = thresholdYellow != null ? thresholdYellow : null;
     const tOrange = thresholdOrange != null ? thresholdOrange : null;
     const tRed = thresholdRed != null ? thresholdRed : null;
 
+    // y 軸改為固定範圍：從 0 起算，上界必須同時容納資料最大值與三個閾值，
+    // 並額外保留 10% 邊界，讓最高的閾值線（通常是紅色）不會貼齊上緣。
+    // 資料量可能上萬筆，用迴圈而非 Math.max(...arr) 避免超出參數上限。
+    let dataMax = points[0].y;
+    for (const p of points) {
+      if (p.y > dataMax) dataMax = p.y;
+    }
+    const thresholdMax = Math.max(
+      tYellow != null ? tYellow : 0,
+      tOrange != null ? tOrange : 0,
+      tRed != null ? tRed : 0,
+    );
+    // 固定 y 軸下界為 0，上界取「資料最大值」與「最大閾值」中較大者再加 10% 邊界，
+    // 並設一個最小高度（至少 1 分）避免資料與閾值都極小時圖形被壓扁。
+    const axisMin = 0;
+    const axisMax = Math.max(dataMax, thresholdMax, 1) * 1.1;
+
+    // 閾值水平線：以 borderDash 虛線 dataset 實作。
+    // 固定範圍已保證三個閾值都落在 y 軸內，因此一律畫出，圖例與線條一致。
     function thresholdDataset(value, color, label) {
-      if (value == null || value < axisMin || value > axisMax) return null;
+      if (value == null) return null;
       const first = points[0].x;
       const last = points[points.length - 1].x;
       return {
@@ -176,6 +179,7 @@
       label: ctx => `${ctx.dataset.label}：${Number(ctx.parsed.y).toFixed(3)} 分`,
     };
     options.scales.x.time.tooltipFormat = 'yyyy-MM-dd HH:mm:ss';
+    // 固定 y 軸範圍
     options.scales.y.min = axisMin;
     options.scales.y.max = axisMax;
 
@@ -188,11 +192,31 @@
     }
   }
 
+  // ── 系統圖統一樣式 ────────────────────────────────────────
+  // 所有系統圖（CPU/記憶體/磁碟）折線統一使用橘色。
+  const SYS_ORANGE = 'rgb(251,146,60)';
+  const SYS_ORANGE_FILL = 'rgba(251,146,60,0.08)';
+
+  // 系統圖 y 軸預設固定 0%–100%，可傳入 yMax 覆寫上限（例如 CPU 負載用 0%–10%）。
+  function systemChartOptions(yLabel, yMax = 100) {
+    const options = baseChartOptions(yLabel);
+    options.scales.y.min = 0;
+    options.scales.y.max = yMax;
+    return options;
+  }
+
   // ── 建立或更新系統圖（通用） ──────────────────────────────
   // chartInstances stores { canvasId: Chart instance }
   const _chartInstances = {};
+  // 圖表資料欄位對照(集中管理,避免在卡片定義中散落字串常值)
+  const METRIC_FIELDS = Object.freeze({
+    cpuLoad5:  'load_5',
+    cpuLoad15: 'load_15',
+    memory:    'memory_use',
+    diskUsed:  'used',
+  });
 
-  function renderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color) {
+  function renderSingleChart(canvasId, noDataId, data, field, yLabel, color, yMax = 100) {
     const noDataEl = document.getElementById(noDataId);
     const canvas = document.getElementById(canvasId);
     if (!canvas || !noDataEl) return;
@@ -200,7 +224,7 @@
     // Ensure data is an array
     const arr = Array.isArray(data) ? data : [];
     const points = arr
-      .map(d => ({ x: new Date(d.time).getTime(), y: d[valueKey] }))
+      .map(d => ({ x: new Date(d.time).getTime(), y: d[field] }))
       .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
       .sort((a, b) => a.x - b.x);
 
@@ -217,8 +241,8 @@
     const dataset = {
       label: yLabel,
       data: points,
-      borderColor: color,
-      backgroundColor: color.replace(')', ', 0.08)').replace('rgb', 'rgba'),
+      borderColor: SYS_ORANGE,
+      backgroundColor: SYS_ORANGE_FILL,
       borderWidth: 1.5,
       pointRadius: 0,
       fill: true,
@@ -226,13 +250,14 @@
     };
 
     if (_chartInstances[canvasId]) {
-      _chartInstances[canvasId].data.datasets[0].data = points;
+      _chartInstances[canvasId].data.datasets = [dataset];
+      _chartInstances[canvasId].options = systemChartOptions(yLabel, yMax);
       _chartInstances[canvasId].update('none');
     } else {
       _chartInstances[canvasId] = new Chart(canvas, {
         type: 'line',
         data: { datasets: [dataset] },
-        options: baseChartOptions(yLabel),
+        options: systemChartOptions(yLabel, yMax),
       });
     }
   }
@@ -259,41 +284,18 @@
     });
 
     // ── CPU + Memory cards ──
-    const cpuMemCards = [];
-
-    const cpuConfigs = [
-      { key: 'load_1', label: 'CPU 負載 1m（Load_1）', color: 'rgb(74,222,128)' },
-      { key: 'load_5', label: 'CPU 負載 5m（Load_5）', color: 'rgb(52,211,153)' },
-      { key: 'load_15', label: 'CPU 負載 15m（Load_15）', color: 'rgb(16,185,129)' },
-    ];
-
     // cpu 是一個扁平陣列，每筆同時含 load_1 / load_5 / load_15
     const cpuData = Array.isArray(sysData.cpu) ? sysData.cpu : [];
-    for (const cfg of cpuConfigs) {
-      const canvasId = `chart-cpu-${cfg.key}`;
-      const noDataId = `nodata-cpu-${cfg.key}`;
-      cpuMemCards.push({
-        title: cfg.label,
-        canvasId,
-        noDataId,
-        data: cpuData,
-        valueKey: cfg.key,
-        yLabel: cfg.key,
-        color: cfg.color,
-      });
-    }
-
-    // Memory card
     const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
-    cpuMemCards.push({
-      title: '記憶體使用率（MemoryUSE %）',
-      canvasId: 'chart-memory',
-      noDataId: 'nodata-memory',
-      data: memData,
-      valueKey: 'memory_use',
-      yLabel: 'MemoryUSE %',
-      color: 'rgb(251,191,36)',
-    });
+
+    // 卡片定義：single = 單線圖
+    // CPU 負載 5m / 15m 分別為獨立圖表，Y 軸範圍 0%–10%
+    
+    const cpuMemCards = [
+      { type: 'single', title: 'CPU 負載 5m（Load_5）',   canvasId: 'chart-cpu-load_5',  noDataId: 'nodata-cpu-load_5',  data: cpuData, field: METRIC_FIELDS.cpuLoad5,  yLabel: 'Load_5',  yMax: 10 },
+      { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'chart-cpu-load_15', noDataId: 'nodata-cpu-load_15', data: cpuData, field: METRIC_FIELDS.cpuLoad15, yLabel: 'Load_15', yMax: 10 },
+      { type: 'single', title: '記憶體使用率（Memory %）', canvasId: 'chart-memory',      noDataId: 'nodata-memory',      data: memData, field: METRIC_FIELDS.memory,    yLabel: 'Memory %' },
+    ];
 
     if (cpuMemGrid) {
       cpuMemGrid.innerHTML = cpuMemCards.map(c => `
@@ -307,7 +309,7 @@
       `).join('');
 
       for (const c of cpuMemCards) {
-        renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+        renderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color, c.yMax);
       }
     }
 
@@ -330,7 +332,7 @@
         canvasId,
         noDataId,
         data: diskDataObj[fsPath],
-        valueKey: 'used',
+        field: METRIC_FIELDS.diskUsed,
         yLabel: 'Used %',
         color: 'rgb(251,146,60)',
       });
@@ -342,7 +344,7 @@
         canvasId: 'chart-disk-empty',
         noDataId: 'nodata-disk-empty',
         data: [],
-        valueKey: 'used',
+        field: METRIC_FIELDS.diskUsed,
         yLabel: 'Used %',
         color: 'rgb(251,146,60)',
       });
@@ -360,7 +362,7 @@
       `).join('');
 
       for (const c of diskCards) {
-        renderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+        renderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color);
       }
     }
   }
@@ -443,14 +445,14 @@
 
     const _compChartInstances = {};
 
-    function compRenderSingleChart(canvasId, noDataId, data, valueKey, yLabel, color) {
+    function compRenderSingleChart(canvasId, noDataId, data, field, yLabel, color, yMax = 100) {
       const noDataEl = document.getElementById(noDataId);
       const canvas = document.getElementById(canvasId);
       if (!canvas || !noDataEl) return;
 
       const arr = Array.isArray(data) ? data : [];
       const points = arr
-        .map(d => ({ x: new Date(d.time).getTime(), y: d[valueKey] }))
+        .map(d => ({ x: new Date(d.time).getTime(), y: d[field] }))
         .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
         .sort((a, b) => a.x - b.x);
 
@@ -467,15 +469,15 @@
       const dataset = {
         label: yLabel,
         data: points,
-        borderColor: color,
-        backgroundColor: color,
+        borderColor: SYS_ORANGE,
+        backgroundColor: SYS_ORANGE,
         borderWidth: 1.5,
         pointRadius: 0,
         fill: false,
         tension: 0.2,
       };
 
-      const options = baseChartOptions(yLabel);
+      const options = systemChartOptions(yLabel, yMax);
 
       if (_compChartInstances[canvasId]) {
         _compChartInstances[canvasId].data.datasets = [dataset];
@@ -500,20 +502,15 @@
       });
 
       // CPU + Memory
-      const cpuMemCards = [];
-      const cpuConfigs = [
-        { key: 'load_1', label: 'CPU 負載 1m（Load_1）', color: 'rgb(74,222,128)' },
-        { key: 'load_5', label: 'CPU 負載 5m（Load_5）', color: 'rgb(52,211,153)' },
-        { key: 'load_15', label: 'CPU 負載 15m（Load_15）', color: 'rgb(16,185,129)' },
-      ];
+      // CPU 負載 5m / 15m 分別為獨立圖表，Y 軸範圍 0%–10%
       const cpuData = Array.isArray(sysData.cpu) ? sysData.cpu : [];
-      for (const cfg of cpuConfigs) {
-        const canvasId = `comp-chart-cpu-${cfg.key}`;
-        const noDataId = `comp-nodata-cpu-${cfg.key}`;
-        cpuMemCards.push({ title: cfg.label, canvasId, noDataId, data: cpuData, valueKey: cfg.key, yLabel: cfg.key, color: cfg.color });
-      }
       const memData = Array.isArray(sysData.memory) ? sysData.memory : [];
-      cpuMemCards.push({ title: '記憶體使用率（MemoryUSE %）', canvasId: 'comp-chart-memory', noDataId: 'comp-nodata-memory', data: memData, valueKey: 'memory_use', yLabel: 'MemoryUSE %', color: 'rgb(251,191,36)' });
+
+      const cpuMemCards = [
+        { type: 'single', title: 'CPU 負載 5m（Load_5）',   canvasId: 'chart-cpu-load_5',  noDataId: 'nodata-cpu-load_5',  data: cpuData, field: METRIC_FIELDS.cpuLoad5,  yLabel: 'Load_5',  yMax: 10 },
+        { type: 'single', title: 'CPU 負載 15m（Load_15）', canvasId: 'chart-cpu-load_15', noDataId: 'nodata-cpu-load_15', data: cpuData, field: METRIC_FIELDS.cpuLoad15, yLabel: 'Load_15', yMax: 10 },
+        { type: 'single', title: '記憶體使用率（Memory %）', canvasId: 'chart-memory',      noDataId: 'nodata-memory',      data: memData, field: METRIC_FIELDS.memory,    yLabel: 'Memory %' },
+      ];
 
       if (cpuMemGrid) {
         cpuMemGrid.innerHTML = cpuMemCards.map(c => `
@@ -525,7 +522,9 @@
             </div>
           </div>
         `).join('');
-        for (const c of cpuMemCards) compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+        for (const c of cpuMemCards) {
+          compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color, c.yMax);
+        }
       }
 
       // Disk
@@ -538,10 +537,10 @@
       const diskPaths = Object.keys(diskDataObj).sort();
       for (const fsPath of diskPaths) {
         const safeId = fsPath.replace(/[^a-zA-Z0-9]/g, '_');
-        diskCards.push({ title: `磁碟 ${fsPath}（Used %）`, canvasId: `comp-chart-disk-${safeId}`, noDataId: `comp-nodata-disk-${safeId}`, data: diskDataObj[fsPath], valueKey: 'used', yLabel: 'Used %', color: 'rgb(251,146,60)' });
+        diskCards.push({ title: `磁碟 ${fsPath}（Used %）`, canvasId: `comp-chart-disk-${safeId}`, noDataId: `comp-nodata-disk-${safeId}`, data: diskDataObj[fsPath], field: METRIC_FIELDS.diskUsed, yLabel: 'Used %', color: 'rgb(251,146,60)' });
       }
       if (diskPaths.length === 0) {
-        diskCards.push({ title: '磁碟使用率', canvasId: 'comp-chart-disk-empty', noDataId: 'comp-nodata-disk-empty', data: [], valueKey: 'used', yLabel: 'Used %', color: 'rgb(251,146,60)' });
+        diskCards.push({ title: '磁碟使用率', canvasId: 'comp-chart-disk-empty', noDataId: 'comp-nodata-disk-empty', data: [], field: METRIC_FIELDS.diskUsed, yLabel: 'Used %', color: 'rgb(251,146,60)' });
       }
       if (diskGrid) {
         diskGrid.innerHTML = diskCards.map(c => `
@@ -553,7 +552,7 @@
             </div>
           </div>
         `).join('');
-        for (const c of diskCards) compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.valueKey, c.yLabel, c.color);
+        for (const c of diskCards) compRenderSingleChart(c.canvasId, c.noDataId, c.data, c.field, c.yLabel, c.color);
       }
     }
 
@@ -610,7 +609,32 @@
       }
     }
 
-    // ── 右欄：載入同 IP 的儀器（卡片含狀態燈號） ────────
+    // ── 依 file_type 將儀器歸類為四種類型（與後端 status 表歸類邏輯一致） ──
+    // 類型：radar / satellite / HFradar / radarwindprofiler
+    function _categorizeInstrument(fileType) {
+      const ft = fileType || '';
+      if (ft.indexOf('HF') !== -1) return 'HFradar';
+      if (ft.indexOf('satellite') !== -1 || ft.indexOf('SAT') !== -1 ||
+          ft.startsWith('HIMA_') || ft.startsWith('GK2A_')) return 'satellite';
+      if (ft.indexOf('windprofiler') !== -1 || ft.indexOf('WP') !== -1 ||
+          ft.startsWith('RCCL_') || ft.startsWith('RCDS_')) return 'radarwindprofiler';
+      return 'radar';
+    }
+
+    // 計算單一儀器的燈號等級與狀態文字
+    function _instrumentLevel(inst) {
+      const diff = inst.diff_time_minutes;
+      const ty = inst.threshold_yellow ?? 10;
+      const to = inst.threshold_orange ?? 15;
+      const tr = inst.threshold_red ?? 20;
+      if (diff == null || diff >= 14400) return { level: 'disconnected', badgeText: '⚠ 斷線' };
+      if (diff > tr) return { level: 'red', badgeText: '⚠ 異常' };
+      if (diff > to) return { level: 'orange', badgeText: '⚠ 異常' };
+      if (diff > ty) return { level: 'yellow', badgeText: '⚠ 異常' };
+      return { level: 'ok', badgeText: '✓ 正常' };
+    }
+
+    // ── 右欄：載入同 IP 的儀器（下拉式選單，含狀態燈號） ────────
     async function loadRelatedInstruments() {
       try {
         const data = await fetchCurrentStatus();
@@ -623,47 +647,63 @@
           return;
         }
 
-        list.innerHTML = related.map(inst => {
-          const diff = inst.diff_time_minutes;
-          const threshold_yellow = inst.threshold_yellow ?? 10;
-          const threshold_orange = inst.threshold_orange ?? 15;
-          const threshold_red = inst.threshold_red ?? 20;
+        // 依四種類型分組
+        const TYPE_KEYS = ['radar', 'satellite', 'HFradar', 'radarwindprofiler'];
+        const TYPE_LABELS = {
+          radar: 'radar',
+          satellite: 'satellite',
+          HFradar: 'HFradar',
+          radarwindprofiler: 'radarwindprofiler',
+        };
+        const groups = {};
+        for (const inst of related) {
+          const key = _categorizeInstrument(inst.file_type);
+          (groups[key] = groups[key] || []).push(inst);
+        }
 
-          let level, diffText, badgeText;
-          if (diff == null || diff >= 14400) {
-            level = 'disconnected';
-            diffText = '斷線';
-            badgeText = '⚠ 斷線';
-          } else if (diff > threshold_red) {
-            level = 'red';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '⚠ 異常';
-          } else if (diff > threshold_orange) {
-            level = 'orange';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '⚠ 異常';
-          } else if (diff > threshold_yellow) {
-            level = 'yellow';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '⚠ 異常';
-          } else {
-            level = 'ok';
-            diffText = diff.toFixed(1) + ' 分鐘';
-            badgeText = '✓ 正常';
+        let html = '';
+        // 只顯示有對應儀器的類型下拉，完全隱藏空的類型
+        for (const key of TYPE_KEYS) {
+          const groupItems = groups[key] || [];
+          if (groupItems.length === 0) continue;
+          const label = TYPE_LABELS[key];
+          // 所有類型下拉一律預設展開，直接看到所有相關儀器
+          html += `<button class="dept-toggle-btn expanded" data-type-key="${key}">${label}</button>`;
+          html += `<div class="dept-computer-list show" data-type-list="${key}">`;
+          for (const inst of groupItems) {
+            const { level, badgeText } = _instrumentLevel(inst);
+            const isActive = inst.file_type === FILE_TYPE;
+            const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
+                        '&ip=' + encodeURIComponent(inst.ip || '') +
+                        '&name=' + encodeURIComponent(inst.equipment_name || '');
+            // 卡片保留：file_type（區分組內各儀器）+ 儀器狀況燈號 + 狀態文字
+            // （移除重複的 IP／名稱等資訊）
+            const ftLabel = inst.file_type || '--';
+            html += `<a class="nav-item ri-status-item${isActive ? ' active' : ''}" href="${url}">
+              <span class="ri-light ri-light-${level}"></span>
+              <span class="ri-status-ft">${ftLabel}</span>
+              <span class="ri-status-text ri-badge-${level}">${badgeText}</span>
+            </a>`;
           }
+          html += '</div>';
+        }
+        list.innerHTML = html;
 
-          const url = '/history.html?file_type=' + encodeURIComponent(inst.file_type || '') +
-                      '&ip=' + encodeURIComponent(inst.ip || '') +
-                      '&name=' + encodeURIComponent(inst.equipment_name || '');
-
-          return `<a class="related-inst-card" href="${url}">
-            <div class="ri-ip">${inst.ip || '--'}</div>
-            <div class="ri-filetype">${inst.file_type || '--'}</div>
-            <div class="ri-name">${inst.equipment_name || '--'}</div>
-            <div class="ri-diff ri-${level}">${diffText}</div>
-            <span class="ri-badge ri-badge-${level}">${badgeText}</span>
-          </a>`;
-        }).join('');
+        // 綁定展開/收合切換
+        list.querySelectorAll('.dept-toggle-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const key = btn.dataset.typeKey;
+            const sub = list.querySelector(`.dept-computer-list[data-type-list="${key}"]`);
+            const isExpanded = btn.classList.contains('expanded');
+            if (isExpanded) {
+              btn.classList.remove('expanded');
+              sub.classList.remove('show');
+            } else {
+              btn.classList.add('expanded');
+              sub.classList.add('show');
+            }
+          });
+        });
       } catch (e) {
         document.getElementById('related-instruments-list').innerHTML = '<p style="color:#64748b;font-size:0.78rem;">無法載入</p>';
       }

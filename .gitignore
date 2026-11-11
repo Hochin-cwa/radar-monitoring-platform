@@ -2,3 +2,6 @@ config/config.yaml
 __pycache__/
 */__pycache__/
 logs/
+run_uvicorn_non_remove_ver.sh
+run_docker_nginx_non_remove_ver.sh
+CWA_LLM_Setting.json

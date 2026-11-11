@@ -1,0 +1,10 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL":"https:/litellm.cwa.gov.tw",
+    "ANTHROPIC_API_KEY":"sk-9gRuMjUZY3W6oej5LDWMGA",
+    "MODE_TLS_REJECT_UNAUTHROIZED":"0"
+    },
+  "model":"cwa_nemotron-3-120b",
+  "autoUpdatesChannel": "latest",
+  "theme": "light"
+}

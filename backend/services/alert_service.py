@@ -21,6 +21,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from backend.database import get_session
 from backend.models import InstrumentStatus
+from backend.services.log_safe import sanitize_log
 
 logger = logging.getLogger("alert_service")
 
@@ -233,7 +234,7 @@ def get_all_instrument_statuses() -> list[InstrumentStatus]:
                 _INSTRUMENT_STATUS_SQL.execution_options(timeout=timeout)
             ).fetchall()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_all_instrument_statuses: DB error: %s", exc)
+        logger.error("get_all_instrument_statuses: DB error: %s", sanitize_log(exc))
         with _status_cache_lock:
             return _status_cache or []
 
@@ -309,7 +310,7 @@ def set_instrument_thresholds(file_type: str, interval_minutes: float) -> None:
     t_yellow, t_orange, t_red = calculate_thresholds(interval_minutes)
     logger.info(
         "Thresholds updated: %s -> T=%.1f (yellow=%.1f orange=%.1f red=%.1f)",
-        file_type, interval_minutes, t_yellow, t_orange, t_red,
+        sanitize_log(file_type), interval_minutes, t_yellow, t_orange, t_red,
     )
 
 
@@ -337,7 +338,8 @@ def set_instrument_thresholds_direct(
         _status_cache_time = 0.0
     logger.info(
         "Thresholds updated (direct): %s -> yellow=%.1f orange=%.1f red=%.1f",
-        file_type, threshold_yellow, threshold_orange, threshold_red,
+        sanitize_log(file_type),
+        float(threshold_yellow), float(threshold_orange), float(threshold_red),
     )
 
 
@@ -351,7 +353,7 @@ def list_instruments() -> list[dict]:
                 text("SELECT FileType, EquipmentName FROM FileTypeList").execution_options(timeout=timeout)
             ).fetchall()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("list_instruments: DB error: %s", exc)
+        logger.error("list_instruments: DB error: %s", sanitize_log(exc))
         return []
 
     return [

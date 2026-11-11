@@ -12,6 +12,7 @@ from backend.models import (
 from backend.services.alert_service import (
     list_instruments, set_instrument_thresholds_direct,
 )
+from backend.services.log_safe import is_safe_file_type
 
 logger = logging.getLogger("routers.instruments")
 router = APIRouter(prefix="/api/v1/instruments", tags=["instruments"])
@@ -39,6 +40,10 @@ def get_instruments() -> InstrumentListResponse:
 @router.put("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
 def update_threshold(file_type: str, body: ThresholdDirectSetting) -> ThresholdUpdateResponse:
     """接受前端直接設定的三個閾值並持久化。"""
+    # 白名單驗證：即使 DB 不可用也不會把任意字串寫進日誌或 thresholds.yaml
+    if not is_safe_file_type(file_type):
+        raise HTTPException(status_code=422, detail="Invalid file_type")
+
     # 只在 DB 可用時驗證 file_type 是否存在；DB 不可用時直接允許更新
     instruments = list_instruments()
     if instruments:

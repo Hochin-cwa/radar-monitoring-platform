@@ -14,6 +14,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from backend.config import get_config
 from backend.database import get_session
 from backend.services.alert_service import get_instrument_thresholds
+from backend.services.log_safe import sanitize_log
 
 logger = logging.getLogger("history_service")
 
@@ -112,7 +113,15 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     timeout = get_config().system.query_timeout_seconds
     t_yellow, t_orange, t_red = get_instrument_thresholds(file_type)
 
-    # FileTime 為 Unix timestamp（秒），直接在 SQL 端以 FROM_UNIXTIME 轉成 datetime。
+    # FileTime 為 Unix timestamp（秒）。以 FROM_UNIXTIME 在 DB session 時區
+    # （本平台部署於台灣，UTC+8）轉成「牆上時間」，讓圖表上的時間與運維人員
+    # 直接查資料庫看到的 FROM_UNIXTIME 值完全一致（例如最新一筆 11:48:16）。
+    #
+    # 關鍵：回傳時「不可」再標記成 UTC（+00:00）。若標記為 UTC，瀏覽器（UTC+8）
+    # 會再加 8 小時而超出現在時間；反之若直接送 UTC epoch 再靠瀏覽器 +8，
+    # 又會依觀看者時區而異、在非 UTC+8 環境少 8 小時。
+    # 因此一律輸出「無時區後綴的本地牆上時間字串」，瀏覽器 new Date() 以自身
+    # 本地時區解讀，顯示出的時分與 DB 一致。
     sql = text(f"""
         SELECT FROM_UNIXTIME(FileTime) AS Time, DiffTime
         FROM {table}
@@ -129,7 +138,7 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
                 {"ip": ip, "file_type": file_type, "start_ts": start_ts},
             ).fetchall()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_instrument_history: DB error: %s", exc)
+        logger.error("get_instrument_history: DB error: %s", sanitize_log(exc))
         rows = []
 
     data = []
@@ -137,8 +146,11 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
         if row.Time is None:
             continue
         t = row.Time
+        # FROM_UNIXTIME 回傳的是 DB session 時區（UTC+8）的牆上時間，且為 naive
+        # （不帶 tzinfo）。輸出無時區後綴的 ISO 字串，讓前端以本地時區解讀，
+        # 顯示的時分與 DB 直查一致，且不會被再次加上 8 小時。
         if isinstance(t, datetime):
-            t_iso = t.replace(tzinfo=timezone.utc).isoformat() if t.tzinfo is None else t.isoformat()
+            t_iso = t.replace(tzinfo=None).isoformat()
         else:
             t_iso = str(t)
         data.append({
@@ -183,7 +195,7 @@ def get_system_history(ip: str, range: str) -> dict:
 
     logger.info(
         "get_system_history: ip=%s, range=%s, start_dt=%s",
-        ip, range, start_dt.isoformat(),
+        sanitize_log(ip), sanitize_log(range), start_dt.isoformat(),
     )
 
     _SYS_SQL = text("""
@@ -212,7 +224,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 _SYS_SQL.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
-        logger.info("get_system_history (system_status): %d rows for ip=%s", len(rows), ip)
+        logger.info("get_system_history (system_status): %d rows for ip=%s", len(rows), sanitize_log(ip))
 
         for row in rows:
             t_iso = _server_time_iso(row.ServerTime)
@@ -229,7 +241,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 "memory_use": float(row.MemoryUSE) if row.MemoryUSE is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_system_history (system_status): DB error: %s", exc)
+        logger.error("get_system_history (system_status): DB error: %s", sanitize_log(exc))
 
     try:
         with get_session("disk_status") as session:
@@ -237,7 +249,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 _DISK_SQL.execution_options(timeout=timeout),
                 {"ip": ip, "start_dt": start_dt},
             ).fetchall()
-        logger.info("get_system_history (disk_status): %d rows for ip=%s", len(rows), ip)
+        logger.info("get_system_history (disk_status): %d rows for ip=%s", len(rows), sanitize_log(ip))
 
         for row in rows:
             t_iso = _server_time_iso(row.ServerTime)
@@ -249,7 +261,7 @@ def get_system_history(ip: str, range: str) -> dict:
                 "used": float(row.Used) if row.Used is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_system_history (disk_status): DB error: %s", exc)
+        logger.error("get_system_history (disk_status): DB error: %s", sanitize_log(exc))
 
     return {
         "ip": ip,
@@ -274,7 +286,7 @@ def get_environment_history(ip: str, range: str) -> dict:
 
     logger.info(
         "get_environment_history: ip=%s, range=%s, start_str=%s",
-        ip, range, start_str,
+        sanitize_log(ip), sanitize_log(range), start_str,
     )
 
     temperature_data: list[dict] = []
@@ -295,7 +307,7 @@ def get_environment_history(ip: str, range: str) -> dict:
             ).fetchall()
 
         logger.info(
-            "get_environment_history: got %d rows for ip=%s", len(rows), ip,
+            "get_environment_history: got %d rows for ip=%s", len(rows), sanitize_log(ip),
         )
 
         for row in rows:
@@ -318,9 +330,9 @@ def get_environment_history(ip: str, range: str) -> dict:
                 "value": float(row.humidity) if row.humidity is not None else None,
             })
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_environment_history: DB error: %s", exc)
+        logger.error("get_environment_history: DB error: %s", sanitize_log(exc))
     except Exception as exc:
-        logger.error("get_environment_history: unexpected error: %s", exc)
+        logger.error("get_environment_history: unexpected error: %s", sanitize_log(exc))
 
     return {
         "ip": ip,
