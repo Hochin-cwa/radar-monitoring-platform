@@ -37,7 +37,6 @@ def get_instruments() -> InstrumentListResponse:
 
 
 @router.post("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
-@router.put("/{file_type}/threshold", response_model=ThresholdUpdateResponse)
 def update_threshold(file_type: str, body: ThresholdDirectSetting) -> ThresholdUpdateResponse:
     """接受前端直接設定的三個閾值並持久化。"""
     # 白名單驗證：即使 DB 不可用也不會把任意字串寫進日誌或 thresholds.yaml

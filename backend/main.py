@@ -16,7 +16,6 @@ from backend.routers.completeness import router as completeness_router
 from backend.routers.computers import router as computers_router
 from backend.routers.history import router as history_router
 from backend.routers.instruments import router as instruments_router
-from backend.routers.system import router as system_router
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -147,7 +146,6 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(completeness_router)
 app.include_router(computers_router)
 app.include_router(instruments_router)
-app.include_router(system_router)
 app.include_router(history_router)
 
 # Redirect root URL to the instruments page

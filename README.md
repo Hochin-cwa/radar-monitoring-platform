@@ -58,10 +58,10 @@ radar-monitoring-platform/
 ## API 介紹（基礎路徑 `/api/v1`）
 - `GET /completeness/current`：取得所有儀器即時狀態（含 diff_time、是否警報）。  
 - `GET /instruments`：取得儀器清單與目前閾值。  
-- `PUT /instruments/{file_type}/threshold`：更新特定儀器三段閾值。  
+- `POST /instruments/{file_type}/threshold`：更新特定儀器三段閾值。  
 - `GET /history/{file_type}`：查詢特定儀器在給定時間範圍（6h/1d/1w/1m/3m）的 DiffTime 歷史。  
 - `GET /history/system`：查詢特定 IP 電腦的 CPU、記憶體、磁碟歷史。  
-- `GET /system/current`、`GET /disk/current`：取得目前系統負載與磁碟使用率。
+- `GET /computers/current`：取得目前各電腦的系統負載、記憶體與磁碟使用率。
 
 ## 資料模型
 - **FileStatus 資料庫**：各儀器即時快照與歷史記錄（含 IP、FileName、FileType、FileTime、DiffTime）及 FileTypeList 對應設備名稱。  

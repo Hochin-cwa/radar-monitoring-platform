@@ -65,16 +65,6 @@ async function updateThreshold(fileType, thresholds) {
   });
 }
 
-/** 取得系統狀態（負載、記憶體） */
-async function fetchSystemStatus() {
-  return apiFetch('/system/current');
-}
-
-/** 取得磁碟狀態 */
-async function fetchDiskStatus() {
-  return apiFetch('/disk/current');
-}
-
 /** 取得電腦統一狀態（系統 + 磁碟合併） */
 async function fetchComputerStatus() {
   return apiFetch('/computers/current');
