@@ -1,7 +1,7 @@
 if ps -ef |grep backend |grep monitor|grep -v grep ;then
-  kill -9 $( ps -ef |grep backend |grep monitor|grep -v grep|awk '{print $2}' )
+  kill -9 $( ps -ef |grep backend |grep b615|grep -v grep|awk '{print $2}' )
   sleep 5
 fi
 cd ../
 echo $PWD
-nohup uvicorn backend.main:app --host 0.0.0.0 --port 8000 --no-server-header > logs/uvicorn.log 2>&1 &
+nohup uvicorn backend.main:app --host 0.0.0.0 --port 8001 --no-server-header > logs/uvicorn.log 2>&1 &

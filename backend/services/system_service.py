@@ -5,12 +5,31 @@ Groups results by Department from SystemIPList.
 from __future__ import annotations
 import logging
 from collections import OrderedDict
+from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from backend.config import get_config
 from backend.database import get_session
 
 logger = logging.getLogger("system_service")
+
+
+def _server_time_iso(t) -> Optional[str]:
+    """Normalise a ServerTime value to an ISO8601 string with UTC offset.
+
+    DB 的 ServerTime 以 UTC（naive datetime）儲存；若不補上 tzinfo 直接
+    .isoformat()，前端 new Date() 會把它當成瀏覽器本地時間（UTC+8），導致
+    時間早算 8 小時，進而誤判「CPU 更新逾時」。與 history_service 的處理一致。
+    """
+    if t is None:
+        return None
+    if isinstance(t, datetime):
+        return (t.replace(tzinfo=timezone.utc).isoformat()
+                if t.tzinfo is None else t.isoformat())
+    if isinstance(t, (int, float)):
+        return datetime.fromtimestamp(float(t), tz=timezone.utc).isoformat()
+    return str(t)
 
 _COMBINED_SYSTEM_SQL = text("""
 SELECT cl.IP, cl.Load_1, cl.Load_5, cl.LOAD_15, cl.MemoryUSE, cl.ServerTime,
@@ -44,7 +63,6 @@ def get_combined_status() -> tuple[list[dict], bool]:
     for row in sys_rows:
         ip = row.IP
         if ip not in system_dict:
-            server_time = row.ServerTime
             system_dict[ip] = {
                 "ip": ip,
                 "equipment_name": row.EquipmentName or ip,
@@ -53,7 +71,7 @@ def get_combined_status() -> tuple[list[dict], bool]:
                 "load_5":     float(row.Load_5)    if row.Load_5    is not None else None,
                 "load_15":    float(row.LOAD_15)   if row.LOAD_15   is not None else None,
                 "memory_use": float(row.MemoryUSE) if row.MemoryUSE is not None else None,
-                "server_time": server_time.isoformat() if hasattr(server_time, "isoformat") else (str(server_time) if server_time is not None else None),
+                "server_time": _server_time_iso(row.ServerTime),
                 "disks": [],
             }
 

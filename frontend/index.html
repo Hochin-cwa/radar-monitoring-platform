@@ -3,18 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>導向中… — 遙測作業系統資料傳輸監控整合平台</title>
-  <!-- 首頁已停用，導向至儀器即時狀況頁面 -->
-  <meta http-equiv="refresh" content="0; url=/instruments.html" />
-  <script>
-    // 立即導向（replace 不留下瀏覽紀錄，避免返回鍵回到此頁）
-    window.location.replace('/instruments.html');
-  </script>
+  <title>首頁 — 遙測作業系統資料傳輸監控整合平台</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body class="layout">
-  <main class="content">
-    <p class="loading">導向至儀器即時狀況頁面…若未自動跳轉，請點選 <a href="/instruments.html">此連結</a>。</p>
-  </main>
+  <!-- 頁首（共用元件，見 js/header.js） -->
+  <script src="/js/header.js" data-active="index"></script>
+
+  <!-- 內容區塊（單欄） -->
+  <div class="page-body">
+    <main class="main-content">
+      <div id="status-bar" class="status-bar hidden"></div>
+
+      <!-- 上區：儀器運作狀態 -->
+      <section class="section">
+        <h2>儀器運作狀態</h2>
+        <div id="instruments-container" class="group-cards">
+          <p class="loading">載入中…</p>
+        </div>
+      </section>
+
+      <!-- 下區：各科電腦與檔案 -->
+      <section class="section">
+        <h2>各科電腦與檔案</h2>
+        <div id="computers-container" class="group-cards">
+          <p class="loading">載入中…</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 頁尾 -->
+  <footer class="site-footer">
+    <span>© 2026 中央氣象署海氣遙測組 遙測作業系統資料傳輸監控整合平台 | 聯絡我們：遙測應用科</span>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/mainpage.js?v=20261113"></script>
 </body>
 </html>
