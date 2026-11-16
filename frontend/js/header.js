@@ -28,7 +28,7 @@
     { key: 'index',       href: '/index.html',                                  label: '首頁' },
     { key: 'instruments', href: '/instruments.html',                            label: '儀器即時狀況' },
     { key: 'computers',   href: '/computers.html',                              label: '電腦即時狀況' },
-    { key: 'settings',    href: '/settings.html',                               label: '閾值設定' },
+/*  { key: 'settings',    href: '/settings.html',                               label: '閾值設定' }, */
     { key: 'environment', href: '/environment-history.html?ip=192.168.178.19',  label: '環境監控' },
   ];
 

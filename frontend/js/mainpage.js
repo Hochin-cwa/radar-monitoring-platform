@@ -33,29 +33,9 @@ const INSTRUMENT_GROUPS = [
   { key: 'other',    label: '其他',     match: null },  // fallback
 ];
 
-// ── 站碼→中文名稱（複用 instruments.js 的對照概念，供 A5 列出異常站點）──
-const STATION_NAME_MAP = {
-  RCHL: '花蓮', RCKT: '墾丁', RCLY: '林園', RCSL: '樹林', RCNT: '南屯',
-  RCCK: '清泉崗（空軍）', RCGR: '桃園（空軍）', RCCG: '七股',
-  RCWF: '五分山', RCMD: '五分山（另）',
-  RCAY: '岡山（空軍）', RCKU: '嘉義（空軍）', RCNN: '台南（空軍）',
-  RCPO: '新竹（空軍）', RCQS: '台東（空軍）', RCYU: '花蓮（空軍）',
-  RCCL: '剖風儀 中壢', RCDS: '剖風儀 東沙',
-  DS: '東沙',
-  HFradar_dt00: '大潭', HFradar_ya01: '永安1', HFradar_ya00: '永安',
-  HFradar_bg00: '北港', HFradar_sl00: '沙崙', HFradar_dj00: '東莒', HFradar_gy00: '觀音',
-  HIMA: '向日葵9號', GK2A: 'GK2A',
-};
-
-// ── 電腦科別（B1）─────────────────────────────────────────
-const DEPT_LABELS = {
-  wrs:  '氣象雷達科',
-  mrs:  '海象雷達科',
-  sos:  '衛星作業科',
-  dqcs: '品管科',
-  rsa:  '應用科',
-};
-const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
+// ── 站碼→中文名稱、科別對照（統一由 /js/labels.js 提供）──
+// STATION_NAME_MAP / DEPT_LABELS / DEPT_ORDER 皆定義於 labels.js，
+// 需確保 HTML 於本檔之前載入 labels.js。
 
 // ── 電腦門檻（紅燈級距，B2 / B3）──────────────────────────
 const MEM_RED = 80;            // 記憶體使用率 > 80%
@@ -230,11 +210,11 @@ function _cpuTimeoutMinutes(serverTimeStr) {
 }
 
 // ── 電腦：渲染 ────────────────────────────────────────────
-function _renderComputers(items) {
+function _renderComputers(items, instruments) {
   const container = document.getElementById('computers-container');
   if (!container) return;
 
-  // 依科別聚合
+  // 依科別聚合電腦
   const byDept = {};
   for (const k of DEPT_ORDER) byDept[k] = [];
   const extraKeys = [];
@@ -242,6 +222,15 @@ function _renderComputers(items) {
     const dept = (item.department || '').toLowerCase();
     if (!(dept in byDept)) { byDept[dept] = []; extraKeys.push(dept); }
     byDept[dept].push(item);
+  }
+
+  // 依科別聚合「逾時」儀器（diff > threshold_red；斷線/NULL 不觸發）。
+  // instruments 為 null/undefined（儀器 API 失敗）時此表為空，電腦區僅依硬體判定。
+  const alertInstByDept = {};
+  for (const inst of (instruments || [])) {
+    if (!_instrumentAlert(inst)) continue;
+    const dept = (inst.department || '').toLowerCase();
+    (alertInstByDept[dept] = alertInstByDept[dept] || []).push(inst);
   }
 
   const orderedKeys = [...DEPT_ORDER.filter(k => byDept[k] && byDept[k].length > 0),
@@ -264,21 +253,35 @@ function _renderComputers(items) {
         problemComputers.push({ item, problems });
       }
     }
-    const isAlert = problemComputers.length > 0;
+
+    // 該科逾時儀器站點中文名稱（去重）
+    const overdueInsts = alertInstByDept[key] || [];
+    const overdueStationNames = [...new Set(overdueInsts.map(_stationChinese))];
+
+    const isAlert = problemComputers.length > 0 || overdueStationNames.length > 0;
     const lightCls = isAlert ? 'status-light-alert-red' : 'status-light-ok';
     const cardCls = isAlert ? 'level-alert-red' : 'level-ok';
 
     let detail;
     if (isAlert) {
-      // B4：列項目 + 數值，依電腦分行（以 IP 標示異常電腦）
-      const lines = problemComputers.map(pc => {
+      // B4：硬體問題逐台列出（以 IP 標示）
+      const hwLines = problemComputers.map(pc => {
         const ipLabel = _escape(pc.item.ip || '--');
         return `<div class="metric-row diff-alert-red">
                   <span class="metric-label">${ipLabel}</span>
                   <span class="metric-value">${_escape(pc.problems.join('、'))}</span>
                 </div>`;
       }).join('');
-      detail = lines;
+
+      // 新增：該科任一儀器逾時 → 列出逾時站點名稱
+      let instLine = '';
+      if (overdueStationNames.length > 0) {
+        instLine = `<div class="metric-row diff-alert-red">
+                      <span class="metric-label">儀器逾時</span>
+                      <span class="metric-value">${_escape(overdueStationNames.join('、'))}</span>
+                    </div>`;
+      }
+      detail = hwLines + instLine;
     } else {
       detail = `<div class="light-card-diff diff-ok">正常（${list.length} 台）</div>`;
     }
@@ -316,34 +319,154 @@ function _renderDisconnected(containerId, label) {
     </div>`;
 }
 
+// ── 電腦使用排行榜 TOP 5（CPU / 記憶體 / 磁碟）────────────
+// 設計與資料邏輯比照 instruments.js 的電腦資源 TOP 5 面板。
+
+/* 產生單條 bar HTML */
+function _renderBar(label, value, maxValue, colors) {
+  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
+  return `
+    <div class="bar-item">
+      <div class="bar-label">${_escape(label)}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
+      </div>
+      <div class="bar-value" style="color:${colors.val}">${displayVal}</div>
+    </div>`;
+}
+
+/* CPU 色階（依使用百分比估色長度） */
+function _cpuBarColor(pct) {
+  if (pct >= 80) return { bar: '#ef4444', val: '#ef4444' };
+  if (pct >= 60) return { bar: '#fb923c', val: '#fb923c' };
+  if (pct >= 40) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
+
+function _renderCpuTop5(computers) {
+  const container = document.getElementById('top-cpu');
+  if (!container) return;
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+  const valid = computers.filter(c => c.load_1 != null);
+  const sorted = valid.sort((a, b) => b.load_1 - a.load_1).slice(0, 5);
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無 CPU 負載資料</p>';
+    return;
+  }
+  const maxVal = Math.max(sorted[0].load_1, 100);
+  container.innerHTML = sorted.map(c => {
+    const label = c.ip || c.equipment_name || '--';
+    const pct = maxVal > 0 ? Math.min((c.load_1 / maxVal) * 100, 100) : 0;
+    return _renderBar(label, c.load_1, maxVal, _cpuBarColor(pct));
+  }).join('');
+}
+
+function _memBarColor(memPct) {
+  if (memPct > 80) return { bar: '#ef4444', val: '#ef4444' };
+  if (memPct > 70) return { bar: '#fb923c', val: '#fb923c' };
+  if (memPct > 60) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
+
+function _renderMemoryTop5(computers) {
+  const container = document.getElementById('top-memory');
+  if (!container) return;
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+  const valid = computers.filter(c => c.memory_use != null);
+  const sorted = valid.sort((a, b) => b.memory_use - a.memory_use).slice(0, 5);
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無記憶體資料</p>';
+    return;
+  }
+  container.innerHTML = sorted.map(c => {
+    const label = c.ip || c.equipment_name || '--';
+    return _renderBar(label, c.memory_use, 100, _memBarColor(c.memory_use));
+  }).join('');
+}
+
+function _diskBarColor(usedPct) {
+  if (usedPct > 99) return { bar: '#ef4444', val: '#ef4444' };
+  if (usedPct > 95) return { bar: '#fb923c', val: '#fb923c' };
+  if (usedPct > 90) return { bar: '#facc15', val: '#facc15' };
+  return { bar: '#4ade80', val: '#4ade80' };
+}
+
+function _renderDiskTop5(computers) {
+  const container = document.getElementById('top-disk');
+  if (!container) return;
+  if (!computers || computers.length === 0) {
+    container.innerHTML = '<p class="loading">無資料</p>';
+    return;
+  }
+  const diskItems = [];
+  for (const c of computers) {
+    if (!c.disks || c.disks.length === 0) continue;
+    for (const d of c.disks) {
+      if (d.used_pct != null) {
+        diskItems.push({ label: `${c.ip} ${d.file_system}`, value: d.used_pct });
+      }
+    }
+  }
+  const sorted = diskItems.sort((a, b) => b.value - a.value).slice(0, 5);
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="loading">無磁碟資料</p>';
+    return;
+  }
+  container.innerHTML = sorted.map(item =>
+    _renderBar(item.label, item.value, 100, _diskBarColor(item.value))
+  ).join('');
+}
+
+function _renderComputerRanking(items) {
+  _renderCpuTop5(items);
+  _renderMemoryTop5(items);
+  _renderDiskTop5(items);
+}
+
 // ── 資料刷新 ──────────────────────────────────────────────
 async function _refreshInstruments() {
   try {
     const data = await fetchCurrentStatus();
-    _renderInstruments(data.instruments || []);
-    return true;
+    const instruments = data.instruments || [];
+    _renderInstruments(instruments);
+    return { ok: true, instruments };
   } catch (e) {
     _renderDisconnected('instruments-container', '儀器運作狀態');
-    return false;
+    return { ok: false, instruments: null };
   }
 }
 
-async function _refreshComputers() {
+/**
+ * @param {Array|null} instruments 儀器清單；null 表示儀器 API 取得失敗，
+ *        此時電腦區僅依硬體指標判定（不因缺儀器資料而誤判）。
+ */
+async function _refreshComputers(instruments) {
   try {
     const data = await fetchComputerStatus();
-    _renderComputers(data.items || []);
+    _renderComputers(data.items || [], instruments || []);
+    _renderComputerRanking(data.items || []);
     if (data.disk_error) {
       _showStatus('⚠ 磁碟資料庫無法連線，磁碟資訊可能不完整', 'warning');
     }
     return true;
   } catch (e) {
     _renderDisconnected('computers-container', '各科電腦與檔案');
+    _renderComputerRanking([]);
     return false;
   }
 }
 
 async function _refreshData() {
-  const [okI, okC] = await Promise.all([_refreshInstruments(), _refreshComputers()]);
+  // 先取得儀器資料，才能供電腦區（依科別）判定「該科任一儀器逾時」。
+  const { ok: okI, instruments } = await _refreshInstruments();
+  const okC = await _refreshComputers(instruments);
   if (okI && okC) {
     _clearStatus();
   } else if (!okI || !okC) {

@@ -8,51 +8,7 @@ let _refreshTimer = null;
 let _activeDept = 'all';
 let _lastInstruments = null;
 
-const DEPT_LABELS = {
-  sos:  '衛星作業科',
-  dqcs: '品管科',
-  rsa:  '應用科',
-  wrs:  '氣象雷達科',
-  mrs:  '海象雷達科',
-};
-const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
-
-/* ── 站碼→中文名稱對照表 ── */
-const STATION_NAME_MAP = {
-  // 雷達站
-  RCHL: '花蓮',
-  RCKT: '墾丁',
-  RCLY: '林園',
-  RCSL: '樹林',
-  RCNT: '南屯',
-  RCCK: '清泉崗（空軍）',
-  RCGR: '桃園（空軍）',
-  RCCG: '七股',
-  RCWF: '五分山',
-  RCMD: '五分山（另）',
-  // 空軍基地站
-  RCAY: '岡山（空軍）',
-  RCKU: '嘉義（空軍）',
-  RCNN: '台南（空軍）',
-  RCPO: '新竹（空軍）',
-  RCQS: '台東（空軍）',
-  RCYU: '花蓮（空軍）',
-  // 剖風儀雷達站
-  RCCL: '剖風儀 中壢',
-  RCDS: '剖風儀 東沙',
-  // 高頻雷達
-  DS: '東沙',
-  HFradar_dt00: '大潭',
-  HFradar_ya01: '永安1',
-  HFradar_ya00: '永安',
-  HFradar_bg00: '北港',
-  HFradar_sl00: '沙崙',
-  HFradar_dj00: '東莒',
-  HFradar_gy00: '觀音',
-  // 衛星
-  HIMA: '向日葵9號',
-  GK2A: 'GK2A',
-};
+// DEPT_LABELS / DEPT_ORDER / STATION_NAME_MAP 統一由 /js/labels.js 提供。
 
 /**
  * 從 file_type 提取站碼並回傳中文名稱（若有對應）

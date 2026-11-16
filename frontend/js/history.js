@@ -568,8 +568,7 @@
           const dept = item.department || 'other';
           (groups[dept] = groups[dept] || []).push(item);
         }
-        const DEPT_LABELS = { sos: '衛星作業科', dqcs: '品管科', rsa: '應用科', wrs: '氣象雷達科', mrs: '海象雷達科' };
-        const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
+        // DEPT_LABELS / DEPT_ORDER 統一由 /js/labels.js 提供。
         const orderedKeys = [...DEPT_ORDER.filter(k => groups[k]), ...Object.keys(groups).filter(k => !DEPT_ORDER.includes(k))];
 
         let html = '';

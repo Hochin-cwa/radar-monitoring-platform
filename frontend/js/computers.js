@@ -13,14 +13,7 @@ let _activeDept = 'all';
 let _lastItems = null;
 let _lastDiskError = false;
 
-const DEPT_LABELS = {
-  sos:  '衛星作業科',
-  dqcs: '品管科',
-  rsa:  '應用科',
-  wrs:  '氣象雷達科',
-  mrs:  '海象雷達科',
-};
-const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
+// DEPT_LABELS / DEPT_ORDER 統一由 /js/labels.js 提供。
 
 // ── 門檻常數 ──────────────────────────────────────────────
 const MEM_YELLOW = 60;
