@@ -245,6 +245,24 @@ function _resetRefreshTimer() {
   _refreshTimer = setInterval(_refreshData, REFRESH_INTERVAL_MS);
 }
 
+/**
+ * 讀取 URL 查詢參數 ?dept=<科別>，套用科別篩選並標記對應按鈕為 active。
+ * 由首頁（mainpage.js）「各科電腦與檔案」卡片點擊時帶入。
+ */
+function _applyUrlFilter() {
+  const params = new URLSearchParams(window.location.search);
+  const dept = params.get('dept');
+  if (!dept) return;
+
+  const deptKey = dept.toLowerCase();
+  const deptBtn = document.querySelector(`.dept-btn[data-dept="${deptKey}"]`);
+  if (deptBtn) {
+    document.querySelectorAll('.dept-btn').forEach(b => b.classList.remove('active'));
+    deptBtn.classList.add('active');
+    _activeDept = deptKey;
+  }
+}
+
 async function _init() {
   _tickClock();
   setInterval(_tickClock, 1000);
@@ -262,6 +280,8 @@ async function _init() {
       _renderUnifiedGrid(null, _lastDiskError);
     });
   });
+
+  _applyUrlFilter();
 
   await _refreshData();
   _resetRefreshTimer();

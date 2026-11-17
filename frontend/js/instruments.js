@@ -386,11 +386,59 @@ function _buildInstrumentFilter() {
   });
 }
 
+/**
+ * 讀取 URL 查詢參數，套用初始篩選並同步左側導覽列 UI。
+ * 支援：
+ *   ?inst=<站碼>   指定「儀器篩選」到特定站台（如 RCWF、RCMD）；
+ *                  會自動展開該站台所屬分類並標記為 active。
+ *   ?dept=<科別>   指定「科別篩選」到特定科別（如 mrs、sos）。
+ * 由首頁（mainpage.js）卡片點擊時帶入。
+ */
+function _applyUrlFilter() {
+  const params = new URLSearchParams(window.location.search);
+  const inst = params.get('inst');
+  const dept = params.get('dept');
+
+  // 科別篩選同步
+  if (dept) {
+    const deptKey = dept.toLowerCase();
+    const deptBtn = document.querySelector(`.dept-btn[data-dept="${deptKey}"]`);
+    if (deptBtn) {
+      document.querySelectorAll('.dept-btn').forEach(b => b.classList.remove('active'));
+      deptBtn.classList.add('active');
+      _activeDept = deptKey;
+    }
+  }
+
+  // 儀器（站台）篩選同步
+  if (inst && STATION_NAME_MAP[inst]) {
+    const filterContainer = document.getElementById('instrument-filter');
+    if (filterContainer) {
+      const instBtn = filterContainer.querySelector(`.inst-btn[data-inst="${inst}"]`);
+      if (instBtn) {
+        filterContainer.querySelectorAll('.inst-btn').forEach(b => b.classList.remove('active'));
+        instBtn.classList.add('active');
+        _activeInstrument = inst;
+
+        // 展開該站台所屬分類
+        const cat = instBtn.closest('.inst-cat');
+        if (cat) {
+          const body = cat.querySelector('.inst-cat-body');
+          const header = cat.querySelector('.inst-cat-header');
+          if (body) body.style.display = '';
+          if (header) header.classList.add('expanded');
+        }
+      }
+    }
+  }
+}
+
 async function _init() {
   _tickClock();
   setInterval(_tickClock, 1000);
 
   _buildInstrumentFilter();
+  _applyUrlFilter();
 
   document.querySelectorAll('.dept-btn').forEach(btn => {
     btn.addEventListener('click', () => {

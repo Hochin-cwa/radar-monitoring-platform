@@ -122,6 +122,46 @@ function _instrumentAlert(inst) {
 }
 
 // ── 儀器：渲染 ────────────────────────────────────────────
+/**
+ * 計算首頁某群組卡片點擊後，要連往儀器頁的 URL。
+ *   異常時：帶 ?inst=<延遲最嚴重的異常站碼>（精準對應該站台篩選）。
+ *   正常時：帶 ?inst=<群組代表站碼>（stations[0]）；
+ *           科別型群組（無固定 stations）改帶 ?dept=<科別>。
+ * @param {object} g          群組定義（INSTRUMENT_GROUPS 之一）
+ * @param {Array}  list       該群組的全部儀器
+ * @param {Array}  alertInsts 該群組的異常儀器（_instrumentAlert 為真）
+ */
+function _instrumentsHref(g, list, alertInsts) {
+  const base = '/instruments.html';
+
+  // 異常：帶延遲最嚴重之異常站碼
+  if (alertInsts.length > 0) {
+    const worst = alertInsts.reduce(
+      (a, b) => ((b.diff_time_minutes ?? 0) > (a.diff_time_minutes ?? 0) ? b : a)
+    );
+    const key = _prefix(worst);
+    if (STATION_NAME_MAP[key]) {
+      return `${base}?inst=${encodeURIComponent(key)}`;
+    }
+  }
+
+  // 正常：群組代表站碼（固定站碼群組取第一個）
+  if (g.stations && g.stations.length > 0) {
+    const key = g.stations[0];
+    if (STATION_NAME_MAP[key]) {
+      return `${base}?inst=${encodeURIComponent(key)}`;
+    }
+  }
+
+  // 科別型群組：以任一成員的科別帶 ?dept=
+  const dept = list.length > 0 ? _deptOf(list[0]) : '';
+  if (dept) {
+    return `${base}?dept=${encodeURIComponent(dept)}`;
+  }
+
+  return base;
+}
+
 function _renderInstruments(instruments) {
   const container = document.getElementById('instruments-container');
   if (!container) return;
@@ -149,7 +189,7 @@ function _renderInstruments(instruments) {
       detail = `<div class="light-card-diff diff-ok">正常（${list.length} 項）</div>`;
     }
 
-    const href = '/instruments.html';
+    const href = _instrumentsHref(g, list, alertInsts);
     return `
       <div class="instrument-card ${cardCls}" style="cursor:pointer"
            onclick="window.location.href='${href}'">
@@ -286,8 +326,16 @@ function _renderComputers(items, instruments) {
       detail = `<div class="light-card-diff diff-ok">正常（${list.length} 台）</div>`;
     }
 
-    // C2：點某科電腦 → 跳 computers.html 對應科別
-    const href = '/computers.html';
+    // 連結規則：
+    //   該科有儀器逾時 → 儀器頁並篩選該科（儀器篩選維持「全部」）
+    //   其他情況（硬體問題或正常）→ 電腦頁並篩選該科
+    // key 為科別代碼（如 wrs / mrs）；extraKeys 的空字串科別則不帶參數。
+    let href;
+    if (overdueStationNames.length > 0) {
+      href = key ? `/instruments.html?dept=${encodeURIComponent(key)}` : '/instruments.html';
+    } else {
+      href = key ? `/computers.html?dept=${encodeURIComponent(key)}` : '/computers.html';
+    }
 
     return `
       <div class="instrument-card ${cardCls}" style="cursor:pointer"
