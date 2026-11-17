@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>儀器即時狀況 — 遙測作業系統資料傳輸監控整合平台</title>
-  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/style.css?v=20261117b" />
 </head>
 <body class="layout">
   <!-- 頁首（共用元件，見 js/header.js） -->
@@ -12,7 +12,7 @@
 
   <!-- 內容區塊 -->
   <div class="page-body">
-    <!-- 區域導覽（科別篩選） -->
+    <!-- 區域導覽（科別篩選 + 儀器篩選） -->
     <aside class="local-nav">
       <h3 class="local-nav-title">科別篩選</h3>
       <button class="dept-btn active" data-dept="all">全部</button>
@@ -21,6 +21,11 @@
       <button class="dept-btn" data-dept="sos">衛星作業科</button>
       <button class="dept-btn" data-dept="dqcs">品管科</button>
       <button class="dept-btn" data-dept="rsa">應用科</button>
+
+      <h3 class="local-nav-title">儀器篩選</h3>
+      <div id="instrument-filter" class="instrument-filter">
+        <!-- 儀器按鈕由 js/instruments.js 依 labels.js 動態產生 -->
+      </div>
     </aside>
 
     <!-- 主要內容 -->
@@ -32,35 +37,6 @@
           <p class="loading">載入中…</p>
         </div>
       </section>
-
-      <!-- 電腦資源 TOP 5 面板 -->
-      <section class="section">
-        <div class="dashboard-grid">
-          <!-- CPU 負載 Top 5 -->
-          <div class="dash-panel">
-            <h2 class="panel-title">CPU 負載 TOP 5 電腦</h2>
-            <div id="top-cpu" class="bar-list">
-              <p class="loading">載入中…</p>
-            </div>
-          </div>
-
-          <!-- 記憶體使用率 Top 5 -->
-          <div class="dash-panel">
-            <h2 class="panel-title">記憶體使用率 TOP 5 電腦</h2>
-            <div id="top-memory" class="bar-list">
-              <p class="loading">載入中…</p>
-            </div>
-          </div>
-
-          <!-- 磁碟使用率 Top 5 -->
-          <div class="dash-panel">
-            <h2 class="panel-title">磁碟使用率 TOP 5 電腦</h2>
-            <div id="top-disk" class="bar-list">
-              <p class="loading">載入中…</p>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   </div>
 
@@ -70,7 +46,7 @@
   </footer>
 
   <script src="/js/api.js"></script>
-  <script src="/js/labels.js?v=20261113"></script>
-  <script src="/js/instruments.js?v=20261113"></script>
+  <script src="/js/labels.js?v=20261116b"></script>
+  <script src="/js/instruments.js?v=20261117b"></script>
 </body>
 </html>

@@ -64,6 +64,35 @@ const DEPT_LABELS = {
 /* ── 科別顯示順序 ── */
 const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
 
+/* ── 儀器分類（左側「儀器篩選」用）──
+ * 將 STATION_NAME_MAP 的站碼依類別分組；每個分類列出所屬站碼 key。
+ * 未列入任一分類者，於 instruments.js 中自動歸入「其他」。
+ */
+const INSTRUMENT_CATEGORIES = [
+  {
+    key: 'weather_radar',
+    label: '氣象雷達',
+    stations: ['RCHL', 'RCKT', 'RCLY', 'RCSL', 'RCNT', 'RCCG', 'RCWF', 'RCMD',
+               'RCCK', 'RCGR', 'RCAY', 'RCKU', 'RCNN', 'RCPO', 'RCQS', 'RCYU'],
+  },
+  {
+    key: 'ocean_radar',
+    label: '海象雷達',
+    stations: ['DS', 'HFradar_dt00', 'HFradar_ya01', 'HFradar_ya00',
+               'HFradar_bg00', 'HFradar_sl00', 'HFradar_dj00', 'HFradar_gy00'],
+  },
+  {
+    key: 'satellite',
+    label: '氣象衛星',
+    stations: ['HIMA', 'GK2A'],
+  },
+  {
+    key: 'profiler',
+    label: '剖風儀',
+    stations: ['RCCL', 'RCDS'],
+  },
+];
+
 /**
  * 從 file_type 提取站碼並回傳中文名稱（若有對應）。
  * 優先以完整 file_type 匹配，再以 _ 前綴匹配。
@@ -81,4 +110,5 @@ function getStationChinese(fileType) {
 window.STATION_NAME_MAP = STATION_NAME_MAP;
 window.DEPT_LABELS = DEPT_LABELS;
 window.DEPT_ORDER = DEPT_ORDER;
+window.INSTRUMENT_CATEGORIES = INSTRUMENT_CATEGORIES;
 window.getStationChinese = getStationChinese;

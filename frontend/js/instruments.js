@@ -6,6 +6,7 @@
 const REFRESH_INTERVAL_MS = 60_000;
 let _refreshTimer = null;
 let _activeDept = 'all';
+let _activeInstrument = 'all';
 let _lastInstruments = null;
 
 // DEPT_LABELS / DEPT_ORDER / STATION_NAME_MAP 統一由 /js/labels.js 提供。
@@ -24,6 +25,23 @@ function _getStationChinese(fileType) {
 }
 
 function _pad(n) { return String(n).padStart(2, '0'); }
+
+/**
+ * 解析 file_type 對應的站碼 key（即 STATION_NAME_MAP 的 key）。
+ * 先以完整 file_type 匹配，再以 _ 前綴匹配；查無回傳空字串。
+ */
+function _getStationKey(fileType) {
+  if (!fileType) return '';
+  if (STATION_NAME_MAP[fileType]) return fileType;        // 完整匹配
+  const prefix = fileType.split('_')[0];                  // 前綴匹配
+  return STATION_NAME_MAP[prefix] ? prefix : '';
+}
+
+/** 判斷儀器是否屬於指定站碼 key。 */
+function _matchesInstrument(inst, stationKey) {
+  return _getStationKey(inst.file_type || '') === stationKey;
+}
+
 function _formatDatetime(d) {
   return `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())} ` +
          `${_pad(d.getHours())}:${_pad(d.getMinutes())}:${_pad(d.getSeconds())}`;
@@ -56,7 +74,8 @@ function _alertClass(diff, inst) {
   return 'ok';
 }
 
-function _makeCard(inst) {
+function _makeCard(inst, opts = {}) {
+  const allDown = opts.allDown === true;
   const diff = inst.diff_time_minutes;
   const level = _alertClass(diff, inst);
   const isDisconnected = level === 'disconnected';
@@ -81,6 +100,12 @@ function _makeCard(inst) {
   // 中文站名（若有對應）
   const displayName = chineseName || (equipmentName || '--');
 
+  // 「全部中斷」模式：隱藏 FileType 與 IP，改顯示中文字樣
+  const detailRows = allDown
+    ? `<div class="card-meta card-alldown">全部中斷</div>`
+    : `<div class="card-title">${fileType || '--'}</div>
+          <div class="card-meta">${ip || '--'}</div>`;
+
   return `
     <div class="instrument-card level-${level}"
          style="cursor:pointer"
@@ -92,7 +117,7 @@ function _makeCard(inst) {
         <span class="status-light status-light-${level}"></span>
         <div class="light-card-body">
           <div class="card-station">${displayName}</div>
-          <div class="card-title">${fileType || '--'}</div>
+          ${detailRows}
           <div class="light-card-diff diff-${level}">${diffText}</div>
         </div>
       </div>
@@ -114,24 +139,62 @@ function _isAbnormal(inst) {
 }
 
 /**
- * 相同中文名稱的異常儀器只保留延遲時間最大的一筆。
- * 無對應中文名稱者以 file_type + ip 作為唯一 key，不會被合併。
+ * 群組內中文站名的合併 key；無對應中文名稱者以 file_type + ip 作為唯一 key。
  */
-function _dedupeByChineseName(instruments) {
-  const sorted = [...instruments].sort(
-    (a, b) => (b.diff_time_minutes ?? 0) - (a.diff_time_minutes ?? 0)
-  );
-  const seen = new Set();
-  const result = [];
-  for (const inst of sorted) {
-    const chineseName = _getStationChinese(inst.file_type || '');
-    const key = chineseName || `${inst.file_type || ''}_${inst.ip || ''}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(inst);
+function _stationGroupKey(inst) {
+  const chineseName = _getStationChinese(inst.file_type || '');
+  return chineseName || `${inst.file_type || ''}_${inst.ip || ''}`;
+}
+
+/**
+ * 依「科別群組內」統計，產生異常區要顯示的卡片 HTML。
+ *
+ * 規則：
+ *   以中文站名（無中文名者以 file_type+ip）為單位，統計同群組內：
+ *     - 正常數 = 0 且 異常數 > 0（離線數不計）→ 視為「全部中斷」，
+ *       合併成一張卡片（取延遲最大者），且隱藏 FileType / IP，顯示「全部中斷」。
+ *     - 否則（該站名有 ≥1 筆正常）→ 異常儀器各自照常顯示。
+ *   最終依延遲時間由大到小排序。
+ *
+ * @param {Array} groupInsts 該科別群組內的全部儀器（含正常/異常/離線）
+ * @returns {{html:string, count:number}} 異常區卡片 HTML 與卡片數量
+ */
+function _buildAbnormalCards(groupInsts) {
+  // 依站名 key 統計每一站的正常/異常清單
+  const stats = new Map(); // key -> { normal:number, abnormal: inst[] }
+  for (const inst of groupInsts) {
+    const key = _stationGroupKey(inst);
+    if (!stats.has(key)) stats.set(key, { normal: 0, abnormal: [] });
+    const s = stats.get(key);
+    if (_isNormal(inst)) s.normal += 1;
+    else if (_isAbnormal(inst)) s.abnormal.push(inst);
+    // 離線不計
+  }
+
+  // 組出要顯示的卡片項目（inst + 是否為全部中斷）
+  const items = []; // { inst, allDown, diff }
+  for (const { normal, abnormal } of stats.values()) {
+    if (abnormal.length === 0) continue; // 此站無異常，不進異常區
+
+    if (normal === 0) {
+      // 全部中斷：合併為延遲最大的一筆
+      const top = abnormal.reduce(
+        (a, b) => ((b.diff_time_minutes ?? 0) > (a.diff_time_minutes ?? 0) ? b : a)
+      );
+      items.push({ inst: top, allDown: true, diff: top.diff_time_minutes ?? 0 });
+    } else {
+      // 非全部異常：異常儀器各自顯示
+      for (const inst of abnormal) {
+        items.push({ inst, allDown: false, diff: inst.diff_time_minutes ?? 0 });
+      }
     }
   }
-  return result;
+
+  items.sort((a, b) => b.diff - a.diff);
+  return {
+    html: items.map(it => _makeCard(it.inst, { allDown: it.allDown })).join(''),
+    count: items.length,
+  };
 }
 
 function _renderInstruments(instruments) {
@@ -149,12 +212,18 @@ function _renderInstruments(instruments) {
   // 過濾掉 Server Room（環境監控）的儀器，已移至獨立頁面
   const filtered_source = source.filter(i => (i.department || '').toLowerCase() !== 'server room');
 
-  const filtered = _activeDept === 'all'
+  // 科別篩選
+  let filtered = _activeDept === 'all'
     ? filtered_source
     : filtered_source.filter(i => (i.department || '').toLowerCase() === _activeDept.toLowerCase());
 
+  // 儀器篩選：選到特定儀器時，只保留 file_type 對應該站碼者
+  if (_activeInstrument !== 'all') {
+    filtered = filtered.filter(i => _matchesInstrument(i, _activeInstrument));
+  }
+
   if (filtered.length === 0) {
-    container.innerHTML = '<p class="loading">此科別目前無儀器資料</p>';
+    container.innerHTML = '<p class="loading">此條件目前無儀器資料</p>';
     return;
   }
 
@@ -173,19 +242,19 @@ function _renderInstruments(instruments) {
     const total = groupInsts.length;
 
     const normalInsts       = groupInsts.filter(_isNormal);
-    const abnormalInstsRaw  = groupInsts.filter(_isAbnormal);
     const disconnectedInsts = groupInsts.filter(_isDisconnected);
 
-    // 異常儀器：相同中文名稱只保留延遲最大的一筆
-    const abnormalInsts     = _dedupeByChineseName(abnormalInstsRaw);
+    // 異常區：群組內同中文站名「全部中斷」時合併為一筆（取延遲最大者），
+    // 否則異常儀器各自顯示。詳見 _buildAbnormalCards。
+    const abnormal          = _buildAbnormalCards(groupInsts);
 
     const normalCount       = normalInsts.length;
-    const abnormalCount     = abnormalInsts.length;
+    const abnormalCount     = abnormal.count;
     const disconnectedCount = disconnectedInsts.length;
 
     const allCards          = groupInsts.map(_makeCard).join('');
     const normalCards       = normalInsts.map(_makeCard).join('');
-    const abnormalCards     = abnormalInsts.map(_makeCard).join('');
+    const abnormalCards     = abnormal.html;
     const disconnectedCards = disconnectedInsts.map(_makeCard).join('');
 
     return `
@@ -231,121 +300,6 @@ function _renderInstruments(instruments) {
   });
 }
 
-/* ── 電腦資源 TOP 5 面板（CPU / 記憶體 / 磁碟）── */
-
-/* 產生單條 bar HTML */
-function _renderBar(label, value, maxValue, colors) {
-  const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
-  const displayVal = typeof value === 'number' ? value.toFixed(1) : '--';
-  return `
-    <div class="bar-item">
-      <div class="bar-label">${label}</div>
-      <div class="bar-track">
-        <div class="bar-fill" style="width:${pct}%;background:${colors.bar}"></div>
-      </div>
-      <div class="bar-value" style="color:${colors.val}">${displayVal}</div>
-    </div>`;
-}
-
-/* CPU 色階（load 值，非百分比，統一綠色系呈現長度） */
-function _cpuBarColor(pct) {
-  if (pct >= 80) return { bar: '#ef4444', val: '#ef4444' };
-  if (pct >= 60) return { bar: '#fb923c', val: '#fb923c' };
-  if (pct >= 40) return { bar: '#facc15', val: '#facc15' };
-  return { bar: '#4ade80', val: '#4ade80' };
-}
-
-function _renderCpuTop5(computers) {
-  const container = document.getElementById('top-cpu');
-  if (!container) return;
-  if (!computers || computers.length === 0) {
-    container.innerHTML = '<p class="loading">無資料</p>';
-    return;
-  }
-  const valid = computers.filter(c => c.load_1 != null);
-  const sorted = valid.sort((a, b) => b.load_1 - a.load_1).slice(0, 5);
-  if (sorted.length === 0) {
-    container.innerHTML = '<p class="loading">無 CPU 負載資料</p>';
-    return;
-  }
-  const maxVal = Math.max(sorted[0].load_1, 100);
-  container.innerHTML = sorted.map(c => {
-    const label = c.ip || c.equipment_name || '--';
-    const pct = maxVal > 0 ? Math.min((c.load_1 / maxVal) * 100, 100) : 0;
-    return _renderBar(label, c.load_1, maxVal, _cpuBarColor(pct));
-  }).join('');
-}
-
-function _memBarColor(memPct) {
-  if (memPct > 80) return { bar: '#ef4444', val: '#ef4444' };
-  if (memPct > 70) return { bar: '#fb923c', val: '#fb923c' };
-  if (memPct > 60) return { bar: '#facc15', val: '#facc15' };
-  return { bar: '#4ade80', val: '#4ade80' };
-}
-
-function _renderMemoryTop5(computers) {
-  const container = document.getElementById('top-memory');
-  if (!container) return;
-  if (!computers || computers.length === 0) {
-    container.innerHTML = '<p class="loading">無資料</p>';
-    return;
-  }
-  const valid = computers.filter(c => c.memory_use != null);
-  const sorted = valid.sort((a, b) => b.memory_use - a.memory_use).slice(0, 5);
-  if (sorted.length === 0) {
-    container.innerHTML = '<p class="loading">無記憶體資料</p>';
-    return;
-  }
-  container.innerHTML = sorted.map(c => {
-    const label = c.ip || c.equipment_name || '--';
-    return _renderBar(label, c.memory_use, 100, _memBarColor(c.memory_use));
-  }).join('');
-}
-
-function _diskBarColor(usedPct) {
-  if (usedPct > 99) return { bar: '#ef4444', val: '#ef4444' };
-  if (usedPct > 95) return { bar: '#fb923c', val: '#fb923c' };
-  if (usedPct > 90) return { bar: '#facc15', val: '#facc15' };
-  return { bar: '#4ade80', val: '#4ade80' };
-}
-
-function _renderDiskTop5(computers) {
-  const container = document.getElementById('top-disk');
-  if (!container) return;
-  if (!computers || computers.length === 0) {
-    container.innerHTML = '<p class="loading">無資料</p>';
-    return;
-  }
-  const diskItems = [];
-  for (const c of computers) {
-    if (!c.disks || c.disks.length === 0) continue;
-    for (const d of c.disks) {
-      if (d.used_pct != null) {
-        diskItems.push({ label: `${c.ip} ${d.file_system}`, value: d.used_pct });
-      }
-    }
-  }
-  const sorted = diskItems.sort((a, b) => b.value - a.value).slice(0, 5);
-  if (sorted.length === 0) {
-    container.innerHTML = '<p class="loading">無磁碟資料</p>';
-    return;
-  }
-  container.innerHTML = sorted.map(item =>
-    _renderBar(item.label, item.value, 100, _diskBarColor(item.value))
-  ).join('');
-}
-
-async function _refreshComputerPanels() {
-  try {
-    const computerData = await fetchComputerStatus();
-    _renderCpuTop5(computerData.items);
-    _renderMemoryTop5(computerData.items);
-    _renderDiskTop5(computerData.items);
-  } catch (e) {
-    console.error('[instruments] computer panels refresh error', e);
-  }
-}
-
 async function _refreshData() {
   try {
     const data = await fetchCurrentStatus();
@@ -357,7 +311,6 @@ async function _refreshData() {
       e.type === 'db_error' ? 'error' : 'warning'
     );
   }
-  await _refreshComputerPanels();
   document.getElementById('last-refreshed').textContent = _formatDatetime(new Date());
 }
 
@@ -366,9 +319,78 @@ function _resetRefreshTimer() {
   _refreshTimer = setInterval(_refreshData, REFRESH_INTERVAL_MS);
 }
 
+/**
+ * 依 labels.js 的 INSTRUMENT_CATEGORIES 產生「可展開分類」的儀器篩選。
+ * 第一顆為「全部」；其下為各分類（氣象雷達 / 海象雷達 / 氣象衛星 /
+ * 剖風儀 / 其他），點選分類標題展開/收合，分類下列出各站台按鈕。
+ */
+function _buildInstrumentFilter() {
+  const container = document.getElementById('instrument-filter');
+  if (!container) return;
+
+  // 已被明確歸類的站碼
+  const categorized = new Set();
+  for (const cat of INSTRUMENT_CATEGORIES) {
+    for (const s of cat.stations) categorized.add(s);
+  }
+  // 未歸類者 → 其他
+  const otherStations = Object.keys(STATION_NAME_MAP).filter(k => !categorized.has(k));
+
+  const categories = [...INSTRUMENT_CATEGORIES];
+  if (otherStations.length > 0) {
+    categories.push({ key: 'other', label: '其他', stations: otherStations });
+  }
+
+  let html = '<button class="inst-btn inst-all active" data-inst="all">全部</button>';
+
+  for (const cat of categories) {
+    // 只列出實際存在於 STATION_NAME_MAP 的站碼
+    const stations = cat.stations.filter(s => STATION_NAME_MAP[s]);
+    if (stations.length === 0) continue;
+
+    html += `
+      <div class="inst-cat" data-cat="${cat.key}">
+        <button class="inst-cat-header" data-cat-toggle="${cat.key}">
+          <span class="inst-cat-arrow">▸</span>
+          <span class="inst-cat-label">${cat.label}</span>
+        </button>
+        <div class="inst-cat-body" style="display:none">
+          ${stations.map(s =>
+            `<button class="inst-btn" data-inst="${s}">${STATION_NAME_MAP[s]}</button>`
+          ).join('')}
+        </div>
+      </div>`;
+  }
+
+  container.innerHTML = html;
+
+  // 分類標題：展開 / 收合
+  container.querySelectorAll('.inst-cat-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const cat = header.closest('.inst-cat');
+      const body = cat.querySelector('.inst-cat-body');
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : '';
+      header.classList.toggle('expanded', !open);
+    });
+  });
+
+  // 站台按鈕 + 全部：設定目前篩選
+  container.querySelectorAll('.inst-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.inst-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _activeInstrument = btn.dataset.inst;
+      _renderInstruments(null);
+    });
+  });
+}
+
 async function _init() {
   _tickClock();
   setInterval(_tickClock, 1000);
+
+  _buildInstrumentFilter();
 
   document.querySelectorAll('.dept-btn').forEach(btn => {
     btn.addEventListener('click', () => {

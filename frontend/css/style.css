@@ -324,6 +324,88 @@ button:hover { background: #1d4ed8; }
   border-color: #2563eb;
 }
 
+/* ── 儀器篩選（左側區域導覽，可展開分類） ── */
+.instrument-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* 「全部」按鈕 */
+.instrument-filter .inst-all {
+  margin-bottom: 2px;
+}
+
+/* 分類區塊 */
+.instrument-filter .inst-cat {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 分類標題（可點擊展開/收合） */
+.instrument-filter .inst-cat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: #1e2235;
+  color: #cbd5e1;
+  border: 1px solid #2d3148;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.instrument-filter .inst-cat-header:hover {
+  background: #2d3148;
+  color: #e2e8f0;
+}
+.instrument-filter .inst-cat-arrow {
+  display: inline-block;
+  font-size: 0.7rem;
+  transition: transform 0.15s;
+}
+.instrument-filter .inst-cat-header.expanded .inst-cat-arrow {
+  transform: rotate(90deg);
+}
+
+/* 分類展開後的站台清單 */
+.instrument-filter .inst-cat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 0 4px 14px;
+}
+
+/* 站台按鈕 */
+.instrument-filter .inst-btn {
+  width: 100%;
+  text-align: left;
+  background: #1e2235;
+  color: #94a3b8;
+  border: 1px solid #2d3148;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.instrument-filter .inst-btn:hover {
+  background: #2d3148;
+  color: #e2e8f0;
+}
+.instrument-filter .inst-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
 /* ── Instruments grid ── */
 .instruments-grid {
   display: flex;
@@ -515,6 +597,15 @@ button:hover { background: #1d4ed8; }
 
 .light-card-body .card-title {
   margin-bottom: 4px;
+}
+
+.light-card-body .card-meta {
+  margin-bottom: 4px;
+}
+
+.light-card-body .card-alldown {
+  color: #f87171;
+  font-weight: 700;
 }
 
 .light-card-diff {
