@@ -121,6 +121,19 @@ function _instrumentAlert(inst) {
   return diff > red;
 }
 
+/**
+ * 該群組是否「全部中斷」：群組內每一台儀器皆為逾時（diff > threshold_red）
+ * 或斷線 / NULL（diff 為 null 或 > 14400）。空群組不算。
+ */
+function _groupAllDown(list) {
+  if (list.length === 0) return false;
+  return list.every(inst => {
+    const diff = inst.diff_time_minutes;
+    if (diff == null || diff > DISCONNECT_THRESHOLD_MIN) return true;
+    return diff > (inst.threshold_red ?? 20);
+  });
+}
+
 // ── 儀器：渲染 ────────────────────────────────────────────
 /**
  * 計算首頁某群組卡片點擊後，要連往儀器頁的 URL。
@@ -162,7 +175,11 @@ function _instrumentsHref(g, list, alertInsts) {
   return base;
 }
 
-function _renderInstruments(instruments) {
+/**
+ * @param {Array} instruments
+ * @param {Array} notices CWA 雷達站公告 [{station, message}]；可為空陣列
+ */
+function _renderInstruments(instruments, notices = []) {
   const container = document.getElementById('instruments-container');
   if (!container) return;
 
@@ -185,6 +202,14 @@ function _renderInstruments(instruments) {
     if (isAlert) {
       const names = [...new Set(alertInsts.map(_stationChinese))];
       detail = `<div class="light-card-diff diff-alert-red">異常：${_escape(names.join('、'))}</div>`;
+      // 全部中斷時，附上 CWA 公告（公告站名與群組名稱相符者）
+      if (_groupAllDown(list)) {
+        const msgs = notices.filter(n => n.station === g.label).map(n => n.message);
+        if (msgs.length > 0) {
+          detail += msgs.map(m =>
+            `<div class="light-card-diff" style="color:#facc15">📢 ${_escape(m)}</div>`).join('');
+        }
+      }
     } else {
       detail = `<div class="light-card-diff diff-ok">正常（${list.length} 項）</div>`;
     }
@@ -479,11 +504,29 @@ function _renderComputerRanking(items) {
 }
 
 // ── 資料刷新 ──────────────────────────────────────────────
+/**
+ * 只有在某群組全部中斷時才查詢 CWA 公告；查詢失敗不影響首頁其他顯示。
+ */
+async function _loadNoticesIfNeeded(instruments) {
+  const byGroup = {};
+  for (const inst of instruments) {
+    (byGroup[_groupKeyForInstrument(inst)] = byGroup[_groupKeyForInstrument(inst)] || []).push(inst);
+  }
+  if (!Object.values(byGroup).some(_groupAllDown)) return [];
+  try {
+    const res = await fetchRadarNotices();
+    return res.notices || [];
+  } catch (e) {
+    return [];
+  }
+}
+
 async function _refreshInstruments() {
   try {
     const data = await fetchCurrentStatus();
     const instruments = data.instruments || [];
-    _renderInstruments(instruments);
+    const notices = await _loadNoticesIfNeeded(instruments);
+    _renderInstruments(instruments, notices);
     return { ok: true, instruments };
   } catch (e) {
     _renderDisconnected('instruments-container', '儀器運作狀態');

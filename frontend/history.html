@@ -176,6 +176,24 @@
       padding: 0;
     }
 
+    /* ── 麵包屑導覽列（儀器模式） ── */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      background: #161825;
+      border-bottom: 1px solid #2d3148;
+      font-size: 0.85rem;
+    }
+    .breadcrumb a {
+      color: #7dd3fc;
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    .breadcrumb-sep { color: #64748b; }
+    .breadcrumb-current { color: #e2e8f0; font-weight: 600; }
+
     /* ── 全域導覽列（時間範圍）── */
     .global-range-nav {
       display: flex;
@@ -357,37 +375,18 @@
     }
   </style>
 </head>
-<body>
-  <!-- 頁首（含全域導覽列） -->
-  <header id="site-header" class="site-header" style="display:none;">
-    <div class="header-title">
-      <div class="header-line1">中央氣象署海氣遙測組</div>
-      <div class="header-line2">遙測作業系統資料傳輸監控整合平台</div>
-    </div>
-    <nav class="header-nav">
-      <a href="/index.html" class="global-nav-link">首頁</a>
-      <a href="/instruments.html" class="global-nav-link">儀器即時狀況</a>
-      <a href="/computers.html" class="global-nav-link active">電腦即時狀況</a>
-      <a href="/settings.html" class="global-nav-link">閾值設定</a>
-      <a href="/environment-history.html?ip=192.168.178.19" class="global-nav-link">環境監控</a>
-    </nav>
-    <div class="time-bar">
-      <span class="history-header-info">IP：<strong id="header-ip-site">--</strong></span>
-      <span class="history-header-info">名稱：<strong id="header-name-site">--</strong></span>
-    </div>
-  </header>
+<body class="layout">
+  <!-- 頁首（共用元件，見 js/header.js；兩種模式皆固定不變） -->
+  <script src="/js/header.js?v=20261113b" data-no-refresh></script>
 
-  <!-- 舊版頁首（儀器模式用） -->
-  <header id="legacy-header">
-    <div class="header-left">
-      <a href="#" id="back-link" class="back-link">← 返回</a>
-      <h1 id="page-title">歷史資料</h1>
-    </div>
-    <div class="time-bar">
-      <span class="history-header-info">IP：<strong id="header-ip">--</strong></span>
-      <span class="history-header-info" id="header-filetype-wrap">FileType：<strong id="header-filetype">--</strong></span>
-    </div>
-  </header>
+  <!-- 麵包屑導覽列 -->
+  <nav id="breadcrumb-nav" class="breadcrumb" aria-label="breadcrumb">
+    <a href="/index.html">首頁</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="/instruments.html" id="breadcrumb-section">儀器即時狀況</a>
+    <span class="breadcrumb-sep">›</span>
+    <span id="breadcrumb-current" class="breadcrumb-current" aria-current="page">歷史資料</span>
+  </nav>
 
   <!-- 全域導覽列：時間範圍選擇（computer mode 獨立區塊） -->
   <nav id="global-range-nav" class="global-range-nav" style="display:none;">
@@ -472,6 +471,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"
           integrity="sha384-cVMg8E3QFwTvGCDuK+ET4PD341jF3W8nO1auiXfuZNQkzbUUiBGLsIQUE+b1mxws"
           crossorigin="anonymous"></script>
+  <script src="/js/clock.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/labels.js?v=20261113"></script>
   <script src="/js/history.js?v=20261113"></script>

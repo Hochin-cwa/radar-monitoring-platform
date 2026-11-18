@@ -15,9 +15,6 @@
 
   // ── 頁面標題 ──────────────────────────────────────────────
   document.title = `${EQUIPMENT_NAME}（${IP}）— 歷史資料`;
-  document.getElementById('page-title').textContent = `${EQUIPMENT_NAME} 歷史資料`;
-  document.getElementById('header-ip').textContent = IP || '--';
-  document.getElementById('header-filetype').textContent = FILE_TYPE || '--';
 
   // ── 狀態 ──────────────────────────────────────────────────
   let _currentRange = '6h';
@@ -428,18 +425,21 @@
   // ══════════════════════════════════════════════════════════
   const MODE = params.get('mode') || 'instrument';
 
+  // 麵包屑：首頁 › 儀器/電腦即時狀況 › 名稱（IP）
+  const _section = document.getElementById('breadcrumb-section');
+  if (MODE === 'computer') {
+    _section.href = '/computers.html';
+    _section.textContent = '電腦即時狀況';
+  }
+  document.getElementById('breadcrumb-current').textContent =
+    `${EQUIPMENT_NAME}${IP ? `（${IP}）` : ''} 歷史資料`;
+
   if (MODE === 'computer') {
     // ── Computer mode: three-column layout ──────────────────
     document.getElementById('instrument-mode').style.display = 'none';
     document.getElementById('computer-mode').style.display = '';
     document.getElementById('global-range-nav').style.display = 'flex';
 
-    // 顯示全域導覽列頁首，隱藏舊版頁首
-    document.getElementById('site-header').style.display = '';
-    document.getElementById('legacy-header').style.display = 'none';
-    document.body.classList.add('layout');
-    document.getElementById('header-ip-site').textContent = IP || '--';
-    document.getElementById('header-name-site').textContent = EQUIPMENT_NAME || '--';
 
     document.title = `${EQUIPMENT_NAME}（${IP}）— 電腦歷史資料`;
 
@@ -740,10 +740,6 @@
 
   } else {
     // ── Instrument mode (default) ──────────────────────────
-    document.getElementById('site-header').style.display = 'none';
-    document.getElementById('legacy-header').style.display = '';
-    document.getElementById('back-link').href = '/instruments.html';
-    document.getElementById('back-link').textContent = '← 儀器即時狀況';
 
     // 時間範圍按鈕（儀器模式內部）
     document.querySelectorAll('#instrument-range-bar .range-btn').forEach(btn => {

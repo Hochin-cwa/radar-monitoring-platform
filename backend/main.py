@@ -15,6 +15,7 @@ from backend.routers.completeness import router as completeness_router
 from backend.routers.computers import router as computers_router
 from backend.routers.history import router as history_router
 from backend.routers.instruments import router as instruments_router
+from backend.routers.radar_notices import router as radar_notices_router
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -146,6 +147,7 @@ app.include_router(completeness_router)
 app.include_router(computers_router)
 app.include_router(instruments_router)
 app.include_router(history_router)
+app.include_router(radar_notices_router)
 
 # Serve frontend static files
 # 根路徑 "/" 由 StaticFiles(html=True) 直接提供 frontend/index.html（首頁）。

@@ -71,6 +71,14 @@ async function fetchComputerStatus() {
 }
 
 /**
+ * 取得中央氣象署雷達站公告（年度保養 / 維護）
+ * @returns {Promise<{available: boolean, notices: {station: string, message: string}[]}>}
+ */
+async function fetchRadarNotices() {
+  return apiFetch('/radar-notices');
+}
+
+/**
  * 取得儀器 DiffTime 歷史記錄
  * @param {string} fileType
  * @param {string} ip

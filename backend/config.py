@@ -37,9 +37,17 @@ class SystemConfig:
 
 
 @dataclass
+class RadarNoticeConfig:
+    url: str
+    cache_seconds: int
+    timeout_seconds: int
+
+
+@dataclass
 class AppConfig:
     databases: Dict[str, DatabaseConfig]
     system: SystemConfig
+    radar_notice: RadarNoticeConfig
 
 
 def _require(mapping: dict, key: str, context: str) -> object:
@@ -71,6 +79,15 @@ def _parse_system(data: dict) -> SystemConfig:
     )
 
 
+def _parse_radar_notice(data: dict | None) -> RadarNoticeConfig:
+    data = data or {}
+    return RadarNoticeConfig(
+        url=str(data.get("url", "https://www.cwa.gov.tw/Data/js/Data_News.js")),
+        cache_seconds=int(data.get("cache_seconds", 600)),
+        timeout_seconds=int(data.get("timeout_seconds", 5)),
+    )
+
+
 def _load_config(path: Path = _CONFIG_PATH) -> AppConfig:
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
@@ -87,7 +104,8 @@ def _load_config(path: Path = _CONFIG_PATH) -> AppConfig:
         databases[db_name] = _parse_database(db_raw[db_name], db_name)
 
     system = _parse_system(_require(raw, "system", "root"))
-    return AppConfig(databases=databases, system=system)
+    radar_notice = _parse_radar_notice(raw.get("radar_notice"))
+    return AppConfig(databases=databases, system=system, radar_notice=radar_notice)
 
 
 _config: AppConfig | None = None
