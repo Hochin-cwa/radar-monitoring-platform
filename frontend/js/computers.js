@@ -147,6 +147,22 @@ function _renderUnifiedCard(item) {
           </div>`;
   }).join('');
 
+  // CPU 更新逾時時，在卡片最下方顯示對應等級的提示
+  const CPU_TIMEOUT_MINUTES = {
+    yellow: CPU_TIMEOUT_YELLOW,
+    orange: CPU_TIMEOUT_ORANGE,
+    red:    CPU_TIMEOUT_RED,
+  };
+  const noServerTime = !item.server_time || isNaN(new Date(item.server_time).getTime());
+  const cpuTimeoutText = noServerTime
+    ? '無更新時間'
+    : `CPU更新逾時超過${CPU_TIMEOUT_MINUTES[cpuLvl]}分鐘`;
+  const cpuTimeoutRow = cpuLvl !== 'ok'
+    ? `<div class="metric-row diff-alert-${cpuLvl}">
+            <span class="metric-label">${cpuTimeoutText}</span>
+          </div>`
+    : '';
+
   const cardClass = worst !== 'ok' ? `instrument-card level-alert-${worst}` : 'instrument-card level-ok';
 
   const historyUrl = '/history.html?mode=computer&ip=' + encodeURIComponent(item.ip) +
@@ -174,6 +190,7 @@ function _renderUnifiedCard(item) {
           <span class="metric-value">${load15}</span>
         </div>
         ${diskRows}
+        ${cpuTimeoutRow}
       </div>`;
 }
 
