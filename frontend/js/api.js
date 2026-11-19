@@ -89,6 +89,24 @@ async function fetchInstrumentHistory(fileType, ip, range) {
 }
 
 /**
+ * 取得 rb5 / nexrad 雷達依變數拆分的 DiffTime 歷史記錄
+ * @param {string} fileType
+ * @param {string} ip
+ * @param {string} range  6h | 1d | 1w | 1m | 3m
+ */
+async function fetchRadarHistory(fileType, ip, range) {
+  return apiFetch(`/history/${encodeURIComponent(fileType)}/radar?ip=${encodeURIComponent(ip)}&range=${encodeURIComponent(range)}`);
+}
+
+/**
+ * 取得衛星（HIMA_TP / HIMA_TN / GK2A_XW）資料表最近 10 筆
+ * @param {string} fileType
+ */
+async function fetchSatelliteRecent(fileType) {
+  return apiFetch(`/history/${encodeURIComponent(fileType)}/satellite`);
+}
+
+/**
  * 取得同 IP 電腦的 CPU / 記憶體 / 磁碟歷史記錄
  * @param {string} ip
  * @param {string} range  6h | 1d | 1w | 1m | 3m

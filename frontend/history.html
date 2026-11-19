@@ -57,6 +57,21 @@
     }
     .no-data.hidden { display: none; }
 
+    .section.hidden { display: none; }
+    .radar-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 10px; font-size: 0.8rem; color: #e2e8f0; }
+    .radar-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .radar-legend-swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .radar-chart-title { font-size: 0.82rem; color: #94a3b8; margin: 12px 0 6px; font-weight: 500; }
+    .radar-dot-wrapper { height: 320px; }
+    .satellite-table-wrap { overflow-x: auto; }
+    .satellite-table { border-collapse: collapse; width: 100%; font-size: 0.8rem; color: #e2e8f0; }
+    .satellite-table th, .satellite-table td { border: 1px solid #2d3148; padding: 4px 10px; text-align: right; white-space: nowrap; }
+    .satellite-table th { background: #1a1d27; color: #94a3b8; font-weight: 500; }
+    .satellite-table td:nth-child(-n+2), .satellite-table th:nth-child(-n+2) { text-align: left; }
+    .satellite-table td.null-cell { color: #64748b; }
+    .satellite-empty { color: #64748b; font-size: 0.9rem; padding: 12px 0; }
+    .satellite-empty.hidden { display: none; }
+
     .system-charts-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -404,22 +419,49 @@
   <main id="instrument-mode" class="single-col-layout">
     <div id="status-bar" class="status-bar hidden"></div>
 
-    <!-- DiffTime 主圖 -->
-    <div class="section">
-      <h2>資料時間差（DiffTime）</h2>
+    <div class="range-bar" id="instrument-range-bar">
+      <button class="range-btn active" data-range="6h">6 小時</button>
+      <button class="range-btn" data-range="1d">1 天</button>
+      <button class="range-btn" data-range="1w">1 週</button>
+      <button class="range-btn" data-range="1m">1 個月</button>
+      <button class="range-btn" data-range="3m">3 個月</button>
+    </div>
 
-      <div class="range-bar" id="instrument-range-bar">
-        <button class="range-btn active" data-range="6h">6 小時</button>
-        <button class="range-btn" data-range="1d">1 天</button>
-        <button class="range-btn" data-range="1w">1 週</button>
-        <button class="range-btn" data-range="1m">1 個月</button>
-        <button class="range-btn" data-range="3m">3 個月</button>
-      </div>
+    <!-- DiffTime 主圖（一般儀器） -->
+    <div class="section" id="generic-diff-section">
+      <h2>資料時間差（DiffTime）</h2>
 
       <div class="chart-wrapper">
         <canvas id="diff-chart"></canvas>
         <div id="diff-no-data" class="no-data hidden">此時間範圍內無資料</div>
       </div>
+    </div>
+
+    <!-- 雷達 rb5 / nexrad：折線圖 + 打點圖，共用圖說 -->
+    <div class="section hidden" id="radar-diff-section">
+      <h2>資料時間差（DiffTime）— 依變數</h2>
+      <div id="radar-legend" class="radar-legend"></div>
+
+      <h3 class="radar-chart-title">時間差折線圖（縱軸：分鐘）</h3>
+      <div class="chart-wrapper">
+        <canvas id="radar-line-chart"></canvas>
+        <div id="radar-line-no-data" class="no-data hidden">此時間範圍內無資料</div>
+      </div>
+
+      <h3 class="radar-chart-title">檔案到位打點圖（縱軸：變數）</h3>
+      <div class="chart-wrapper radar-dot-wrapper">
+        <canvas id="radar-dot-chart"></canvas>
+        <div id="radar-dot-no-data" class="no-data hidden">此時間範圍內無資料</div>
+      </div>
+    </div>
+
+    <!-- 衛星：最近 10 筆資料表 -->
+    <div class="section hidden" id="satellite-section">
+      <h2 id="satellite-title">衛星資料表（最近 10 筆）</h2>
+      <div class="satellite-table-wrap">
+        <table class="satellite-table" id="satellite-table"></table>
+      </div>
+      <div id="satellite-no-data" class="satellite-empty hidden">資料表無資料</div>
     </div>
 
     <!-- 系統負載與記憶體 -->
@@ -474,6 +516,6 @@
   <script src="/js/clock.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/labels.js?v=20261113"></script>
-  <script src="/js/history.js?v=20261113"></script>
+  <script src="/js/history.js?v=20261118"></script>
 </body>
 </html>
