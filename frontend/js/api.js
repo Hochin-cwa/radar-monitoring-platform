@@ -65,19 +65,17 @@ async function updateThreshold(fileType, thresholds) {
   });
 }
 
-/** 取得系統狀態（負載、記憶體） */
-async function fetchSystemStatus() {
-  return apiFetch('/system/current');
-}
-
-/** 取得磁碟狀態 */
-async function fetchDiskStatus() {
-  return apiFetch('/disk/current');
-}
-
 /** 取得電腦統一狀態（系統 + 磁碟合併） */
 async function fetchComputerStatus() {
   return apiFetch('/computers/current');
+}
+
+/**
+ * 取得中央氣象署雷達站公告（年度保養 / 維護）
+ * @returns {Promise<{available: boolean, notices: {station: string, message: string}[]}>}
+ */
+async function fetchRadarNotices() {
+  return apiFetch('/radar-notices');
 }
 
 /**
@@ -88,6 +86,24 @@ async function fetchComputerStatus() {
  */
 async function fetchInstrumentHistory(fileType, ip, range) {
   return apiFetch(`/history/${encodeURIComponent(fileType)}?ip=${encodeURIComponent(ip)}&range=${encodeURIComponent(range)}`);
+}
+
+/**
+ * 取得 rb5 / nexrad 雷達依變數拆分的 DiffTime 歷史記錄
+ * @param {string} fileType
+ * @param {string} ip
+ * @param {string} range  6h | 1d | 1w | 1m | 3m
+ */
+async function fetchRadarHistory(fileType, ip, range) {
+  return apiFetch(`/history/${encodeURIComponent(fileType)}/radar?ip=${encodeURIComponent(ip)}&range=${encodeURIComponent(range)}`);
+}
+
+/**
+ * 取得衛星（HIMA_TP / HIMA_TN / GK2A_XW）資料表最近 10 筆
+ * @param {string} fileType
+ */
+async function fetchSatelliteRecent(fileType) {
+  return apiFetch(`/history/${encodeURIComponent(fileType)}/satellite`);
 }
 
 /**

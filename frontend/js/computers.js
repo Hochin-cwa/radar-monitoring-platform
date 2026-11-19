@@ -13,14 +13,7 @@ let _activeDept = 'all';
 let _lastItems = null;
 let _lastDiskError = false;
 
-const DEPT_LABELS = {
-  sos:  '衛星作業科',
-  dqcs: '品管科',
-  rsa:  '應用科',
-  wrs:  '氣象雷達科',
-  mrs:  '海象雷達科',
-};
-const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
+// DEPT_LABELS / DEPT_ORDER 統一由 /js/labels.js 提供。
 
 // ── 門檻常數 ──────────────────────────────────────────────
 const MEM_YELLOW = 60;
@@ -154,6 +147,22 @@ function _renderUnifiedCard(item) {
           </div>`;
   }).join('');
 
+  // CPU 更新逾時時，在卡片最下方顯示對應等級的提示
+  const CPU_TIMEOUT_MINUTES = {
+    yellow: CPU_TIMEOUT_YELLOW,
+    orange: CPU_TIMEOUT_ORANGE,
+    red:    CPU_TIMEOUT_RED,
+  };
+  const noServerTime = !item.server_time || isNaN(new Date(item.server_time).getTime());
+  const cpuTimeoutText = noServerTime
+    ? '無更新時間'
+    : `CPU更新逾時超過${CPU_TIMEOUT_MINUTES[cpuLvl]}分鐘`;
+  const cpuTimeoutRow = cpuLvl !== 'ok'
+    ? `<div class="metric-row diff-alert-${cpuLvl}">
+            <span class="metric-label">${cpuTimeoutText}</span>
+          </div>`
+    : '';
+
   const cardClass = worst !== 'ok' ? `instrument-card level-alert-${worst}` : 'instrument-card level-ok';
 
   const historyUrl = '/history.html?mode=computer&ip=' + encodeURIComponent(item.ip) +
@@ -181,6 +190,7 @@ function _renderUnifiedCard(item) {
           <span class="metric-value">${load15}</span>
         </div>
         ${diskRows}
+        ${cpuTimeoutRow}
       </div>`;
 }
 
@@ -252,6 +262,24 @@ function _resetRefreshTimer() {
   _refreshTimer = setInterval(_refreshData, REFRESH_INTERVAL_MS);
 }
 
+/**
+ * 讀取 URL 查詢參數 ?dept=<科別>，套用科別篩選並標記對應按鈕為 active。
+ * 由首頁（mainpage.js）「各科電腦與檔案」卡片點擊時帶入。
+ */
+function _applyUrlFilter() {
+  const params = new URLSearchParams(window.location.search);
+  const dept = params.get('dept');
+  if (!dept) return;
+
+  const deptKey = dept.toLowerCase();
+  const deptBtn = document.querySelector(`.dept-btn[data-dept="${deptKey}"]`);
+  if (deptBtn) {
+    document.querySelectorAll('.dept-btn').forEach(b => b.classList.remove('active'));
+    deptBtn.classList.add('active');
+    _activeDept = deptKey;
+  }
+}
+
 async function _init() {
   _tickClock();
   setInterval(_tickClock, 1000);
@@ -269,6 +297,8 @@ async function _init() {
       _renderUnifiedGrid(null, _lastDiskError);
     });
   });
+
+  _applyUrlFilter();
 
   await _refreshData();
   _resetRefreshTimer();

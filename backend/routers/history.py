@@ -7,7 +7,13 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.services.history_service import get_instrument_history, get_system_history, get_environment_history
+from backend.services.history_service import (
+    get_environment_history,
+    get_instrument_history,
+    get_radar_history,
+    get_satellite_recent,
+    get_system_history,
+)
 from backend.services.log_safe import is_safe_ip, is_safe_file_type
 
 logger = logging.getLogger("routers.history")
@@ -68,4 +74,31 @@ def instrument_history(
     result = get_instrument_history(file_type=file_type, ip=ip, range=range)
     if result is None:
         raise HTTPException(status_code=404, detail=f"file_type '{file_type}' not found")
+    return result
+
+
+@router.get("/api/v1/history/{file_type}/radar")
+def radar_history(
+    file_type: str,
+    ip: str = Query(..., description="儀器 IP"),
+    range: str = Query("1d", description="時間範圍：6h, 1d, 1w, 1m, 3m"),
+):
+    """rb5 / nexrad 雷達：依檔名拆出變數的 DiffTime 歷史記錄。"""
+    if range not in _VALID_RANGES:
+        raise HTTPException(status_code=422, detail=f"Invalid range '{range}'. Must be one of {sorted(_VALID_RANGES)}")
+    file_type = _validate_file_type(file_type)
+    ip = _validate_ip(ip)
+    result = get_radar_history(file_type=file_type, ip=ip, range=range)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"file_type '{file_type}' is not an rb5/nexrad radar type")
+    return result
+
+
+@router.get("/api/v1/history/{file_type}/satellite")
+def satellite_recent(file_type: str):
+    """衛星（HIMA_TP / HIMA_TN / GK2A_XW）對應資料表的最近 10 筆記錄。"""
+    file_type = _validate_file_type(file_type)
+    result = get_satellite_recent(file_type=file_type)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"file_type '{file_type}' has no satellite table")
     return result

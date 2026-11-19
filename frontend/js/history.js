@@ -15,9 +15,6 @@
 
   // ── 頁面標題 ──────────────────────────────────────────────
   document.title = `${EQUIPMENT_NAME}（${IP}）— 歷史資料`;
-  document.getElementById('page-title').textContent = `${EQUIPMENT_NAME} 歷史資料`;
-  document.getElementById('header-ip').textContent = IP || '--';
-  document.getElementById('header-filetype').textContent = FILE_TYPE || '--';
 
   // ── 狀態 ──────────────────────────────────────────────────
   let _currentRange = '6h';
@@ -379,6 +376,180 @@
     bar.className = 'status-bar hidden';
   }
 
+  // ══════════════════════════════════════════════════════════
+  // ═══ 雷達（rb5 / nexrad）與衛星專用顯示 ═══
+  // ══════════════════════════════════════════════════════════
+  // 分類規則需與後端 history_service 一致。
+  const SATELLITE_TABLE_TYPES = ['HIMA_TP', 'HIMA_TN', 'GK2A_XW'];
+  function instrumentKind(fileType) {
+    const ft = (fileType || '').toLowerCase();
+    if (SATELLITE_TABLE_TYPES.includes(fileType)) return 'satellite';
+    if (ft.includes('rb5') || ft.includes('nexrad')) return 'radar';
+    return 'generic';
+  }
+
+  const RANGE_MS = { '6h': 6 * 3600e3, '1d': 24 * 3600e3, '1w': 7 * 24 * 3600e3, '1m': 30 * 24 * 3600e3, '3m': 90 * 24 * 3600e3 };
+  // 折線與圓點共用的顏色（色相分散，深色背景下可辨識）
+  const RADAR_COLORS = [
+    '#38bdf8', '#f472b6', '#a3e635', '#fb923c', '#c084fc', '#facc15',
+    '#2dd4bf', '#f87171', '#818cf8', '#4ade80', '#e879f9', '#fbbf24',
+    '#22d3ee', '#fb7185', '#94a3b8', '#86efac',
+  ];
+  const radarColor = i => RADAR_COLORS[i % RADAR_COLORS.length];
+
+  let _radarLineChart = null;
+  let _radarDotChart = null;
+
+  function showSection(id, visible) {
+    document.getElementById(id).classList.toggle('hidden', !visible);
+  }
+
+  function showOnly(kind) {
+    showSection('generic-diff-section', kind === 'generic');
+    showSection('radar-diff-section', kind === 'radar');
+    showSection('satellite-section', kind === 'satellite');
+  }
+
+  function destroyRadarCharts() {
+    if (_radarLineChart) { _radarLineChart.destroy(); _radarLineChart = null; }
+    if (_radarDotChart) { _radarDotChart.destroy(); _radarDotChart = null; }
+  }
+
+  // 兩張圖共用的 x 軸：右端固定為現在，左端為現在減去選取範圍。
+  function radarTimeScale(range) {
+    const now = Date.now();
+    const scale = timeScaleOptions();
+    scale.min = now - (RANGE_MS[range] || RANGE_MS['6h']);
+    scale.max = now;
+    scale.time.tooltipFormat = 'yyyy-MM-dd HH:mm:ss';
+    return scale;
+  }
+
+  // 固定 y 軸寬度，讓上下兩張圖的繪圖區左右對齊。
+  function fixedYWidth(scale) { scale.afterFit = axis => { axis.width = 72; }; return scale; }
+
+  function renderRadarLegend(variables) {
+    const el = document.getElementById('radar-legend');
+    el.textContent = '';
+    variables.forEach((v, i) => {
+      const item = document.createElement('span');
+      item.className = 'radar-legend-item';
+      const sw = document.createElement('span');
+      sw.className = 'radar-legend-swatch';
+      sw.style.background = radarColor(i);
+      const label = document.createElement('span');
+      label.textContent = `${i + 1}：${v}`;
+      item.append(sw, label);
+      el.appendChild(item);
+    });
+  }
+
+  function renderRadarCharts(res, range) {
+    destroyRadarCharts();
+    const variables = Array.isArray(res.variables) ? res.variables : [];
+    const rows = Array.isArray(res.data) ? res.data : [];
+    const lineCanvas = document.getElementById('radar-line-chart');
+    const dotCanvas = document.getElementById('radar-dot-chart');
+    const lineNo = document.getElementById('radar-line-no-data');
+    const dotNo = document.getElementById('radar-dot-no-data');
+
+    renderRadarLegend(variables);
+
+    const byVar = {};
+    for (const r of rows) {
+      const x = new Date(r.time).getTime();
+      if (!Number.isFinite(x)) continue;
+      (byVar[r.variable] = byVar[r.variable] || []).push({ x, diff: r.diff_time_minutes });
+    }
+    const hasData = variables.some(v => (byVar[v] || []).length > 0);
+    lineNo.classList.toggle('hidden', hasData);
+    dotNo.classList.toggle('hidden', hasData);
+    lineCanvas.style.display = hasData ? '' : 'none';
+    dotCanvas.style.display = hasData ? '' : 'none';
+    if (!hasData) return;
+
+    // ── 折線圖：一個變數一條線 ──
+    const lineSets = variables.map((v, i) => ({
+      label: v,
+      data: (byVar[v] || []).map(p => ({ x: p.x, y: p.diff })).sort((a, b) => a.x - b.x),
+      borderColor: radarColor(i),
+      backgroundColor: radarColor(i),
+      borderWidth: 1.2,
+      pointRadius: 1.5,
+      pointHoverRadius: 4,
+      tension: 0,
+      fill: false,
+    }));
+    const lineOpts = baseChartOptions('分鐘');
+    lineOpts.scales.x = radarTimeScale(range);
+    lineOpts.scales.y.min = 0;
+    fixedYWidth(lineOpts.scales.y);
+    lineOpts.plugins.tooltip.callbacks = {
+      label: ctx => `${ctx.dataset.label}：${Number(ctx.parsed.y).toFixed(2)} 分`,
+    };
+    _radarLineChart = new Chart(lineCanvas, { type: 'line', data: { datasets: lineSets }, options: lineOpts });
+
+    // ── 打點圖：第 i 個變數畫在 y = i ──
+    const dotSets = variables.map((v, i) => ({
+      label: v,
+      data: (byVar[v] || []).map(p => ({ x: p.x, y: i + 1 })),
+      showLine: false,
+      pointStyle: 'circle',
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      borderColor: radarColor(i),
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+    }));
+    const dotOpts = baseChartOptions('變數');
+    dotOpts.scales.x = radarTimeScale(range);
+    dotOpts.scales.y.min = 0.5;
+    dotOpts.scales.y.max = variables.length + 0.5;
+    dotOpts.scales.y.ticks = {
+      color: '#94a3b8',
+      stepSize: 1,
+      callback: val => (Number.isInteger(val) && variables[val - 1]) ? variables[val - 1] : '',
+    };
+    fixedYWidth(dotOpts.scales.y);
+    dotOpts.plugins.tooltip.callbacks = {
+      label: ctx => `${ctx.dataset.label}`,
+    };
+    _radarDotChart = new Chart(dotCanvas, { type: 'line', data: { datasets: dotSets }, options: dotOpts });
+  }
+
+  function renderSatelliteTable(res) {
+    const table = document.getElementById('satellite-table');
+    const empty = document.getElementById('satellite-no-data');
+    document.getElementById('satellite-title').textContent =
+      `衛星資料表 ${res.table || ''}（最近 ${Array.isArray(res.rows) ? res.rows.length : 0} 筆）`;
+    table.textContent = '';
+    const cols = Array.isArray(res.columns) ? res.columns : [];
+    const rows = Array.isArray(res.rows) ? res.rows : [];
+    empty.classList.toggle('hidden', rows.length > 0);
+    if (rows.length === 0) return;
+
+    const thead = table.createTHead().insertRow();
+    for (const c of cols) {
+      const th = document.createElement('th');
+      th.textContent = c;
+      thead.appendChild(th);
+    }
+    const tbody = table.createTBody();
+    for (const r of rows) {
+      const tr = tbody.insertRow();
+      for (const c of cols) {
+        const td = tr.insertCell();
+        const v = r[c];
+        if (v === null || v === undefined) {
+          td.textContent = '-';
+          td.className = 'null-cell';
+        } else {
+          td.textContent = String(v);
+        }
+      }
+    }
+  }
+
   // ── 載入並渲染所有圖表 ────────────────────────────────────
 
   async function loadAll(range) {
@@ -390,18 +561,28 @@
     hideError();
 
     try {
-      // First fetch instrument history — backend may resolve to actual IP
-      const instrData = await fetchInstrumentHistory(FILE_TYPE, IP, range);
+      const kind = instrumentKind(FILE_TYPE);
+      showOnly(kind);
+      let actualIp = IP;
 
-      renderDiffChart(
-        instrData.data,
-        instrData.threshold_yellow,
-        instrData.threshold_orange,
-        instrData.threshold_red,
-      );
+      if (kind === 'satellite') {
+        renderSatelliteTable(await fetchSatelliteRecent(FILE_TYPE));
+      } else if (kind === 'radar') {
+        renderRadarCharts(await fetchRadarHistory(FILE_TYPE, IP, range), range);
+      } else {
+        // First fetch instrument history — backend may resolve to actual IP
+        const instrData = await fetchInstrumentHistory(FILE_TYPE, IP, range);
 
-      // Use the actual IP returned by instrument history for system queries
-      const actualIp = instrData.ip || IP;
+        renderDiffChart(
+          instrData.data,
+          instrData.threshold_yellow,
+          instrData.threshold_orange,
+          instrData.threshold_red,
+        );
+
+        // Use the actual IP returned by instrument history for system queries
+        actualIp = instrData.ip || IP;
+      }
 
       // Fetch system history with actual IP; also try URL IP if different
       let sysData = await fetchSystemHistory(actualIp, range);
@@ -428,18 +609,21 @@
   // ══════════════════════════════════════════════════════════
   const MODE = params.get('mode') || 'instrument';
 
+  // 麵包屑：首頁 › 儀器/電腦即時狀況 › 名稱（IP）
+  const _section = document.getElementById('breadcrumb-section');
+  if (MODE === 'computer') {
+    _section.href = '/computers.html';
+    _section.textContent = '電腦即時狀況';
+  }
+  document.getElementById('breadcrumb-current').textContent =
+    `${EQUIPMENT_NAME}${IP ? `（${IP}）` : ''} 歷史資料`;
+
   if (MODE === 'computer') {
     // ── Computer mode: three-column layout ──────────────────
     document.getElementById('instrument-mode').style.display = 'none';
     document.getElementById('computer-mode').style.display = '';
     document.getElementById('global-range-nav').style.display = 'flex';
 
-    // 顯示全域導覽列頁首，隱藏舊版頁首
-    document.getElementById('site-header').style.display = '';
-    document.getElementById('legacy-header').style.display = 'none';
-    document.body.classList.add('layout');
-    document.getElementById('header-ip-site').textContent = IP || '--';
-    document.getElementById('header-name-site').textContent = EQUIPMENT_NAME || '--';
 
     document.title = `${EQUIPMENT_NAME}（${IP}）— 電腦歷史資料`;
 
@@ -568,8 +752,7 @@
           const dept = item.department || 'other';
           (groups[dept] = groups[dept] || []).push(item);
         }
-        const DEPT_LABELS = { sos: '衛星作業科', dqcs: '品管科', rsa: '應用科', wrs: '氣象雷達科', mrs: '海象雷達科' };
-        const DEPT_ORDER = ['wrs', 'mrs', 'sos', 'dqcs', 'rsa'];
+        // DEPT_LABELS / DEPT_ORDER 統一由 /js/labels.js 提供。
         const orderedKeys = [...DEPT_ORDER.filter(k => groups[k]), ...Object.keys(groups).filter(k => !DEPT_ORDER.includes(k))];
 
         let html = '';
@@ -741,10 +924,6 @@
 
   } else {
     // ── Instrument mode (default) ──────────────────────────
-    document.getElementById('site-header').style.display = 'none';
-    document.getElementById('legacy-header').style.display = '';
-    document.getElementById('back-link').href = '/instruments.html';
-    document.getElementById('back-link').textContent = '← 儀器即時狀況';
 
     // 時間範圍按鈕（儀器模式內部）
     document.querySelectorAll('#instrument-range-bar .range-btn').forEach(btn => {

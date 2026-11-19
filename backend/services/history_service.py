@@ -170,6 +170,199 @@ def get_instrument_history(file_type: str, ip: str, range: str) -> dict:
     }
 
 
+# ── 雷達 rb5 / nexrad 歷史（依檔名還原檔案時間與變數） ─────────────────────
+
+# rb5 檔名：<YYYYMMDDHHmmss><2 位數序號><變數>.vol，例如 2026111807361200dBZv.vol
+# （偶有 .vol.gz 後綴）。變數名稱可含大小寫字母與數字（dBuZ、uPhiDP、Wv…）。
+_RB5_VAR_RE = re.compile(r'(\d{14})\d{2}([A-Za-z][A-Za-z0-9_]*)\.vol(?:\.gz)*$')
+
+# 部分 nexrad 檔名只有分鐘精度，例如 20261118_0741_RCWF_VOL.450
+_NEXRAD_HHMM_RE = re.compile(r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})_')
+
+
+def radar_format_for_file_type(file_type: str) -> Optional[str]:
+    """Return 'rb5' / 'nexrad' for radar file types that get the dual-chart view, else None."""
+    ft = (file_type or "").lower()
+    if "rb5" in ft:
+        return "rb5"
+    if "nexrad" in ft:
+        return "nexrad"
+    return None
+
+
+def _parse_rb5_filename(filename: str) -> Optional[tuple[datetime, str]]:
+    """Return (file time, variable name) for an rb5 file name, or None."""
+    base = (filename or "").replace("\\", "/").rsplit("/", 1)[-1]
+    m = _RB5_VAR_RE.search(base)
+    if not m:
+        return None
+    t = _extract_time_from_filename(m.group(1))
+    if t is None:
+        return None
+    return t, m.group(2)
+
+
+def _parse_nexrad_filename(filename: str) -> Optional[datetime]:
+    base = (filename or "").replace("\\", "/").rsplit("/", 1)[-1]
+    t = _extract_time_from_filename(base)
+    if t is not None:
+        return t
+    m = _NEXRAD_HHMM_RE.search(base)
+    if m:
+        try:
+            return datetime(*(int(g) for g in m.groups()))
+        except ValueError:
+            return None
+    return None
+
+
+def get_radar_history(file_type: str, ip: str, range: str) -> Optional[dict]:
+    """DiffTime history for rb5 / nexrad radar data, split per variable.
+
+    rb5: one series per variable parsed from the file name (dBZ, ZDR, ...).
+    nexrad: one file per time, a single series.
+
+    File times come from the file name (UTC), not from the FileTime column:
+    that column is a float32 and only resolves to ~2 minutes. Times are
+    returned as ISO strings with a 'Z' suffix so the browser renders them in
+    its local zone, the same zone as "now" on the chart's right edge.
+
+    API endpoint: GET /api/v1/history/{file_type}/radar?ip=...&range=...
+    Returns None when file_type is not an rb5 / nexrad type.
+    """
+    fmt = radar_format_for_file_type(file_type)
+    if fmt is None:
+        return None
+
+    start_ts = _parse_range(range).timestamp()
+    timeout = get_config().system.query_timeout_seconds
+    t_yellow, t_orange, t_red = get_instrument_thresholds(file_type)
+
+    sql = text("""
+        SELECT FileName, DiffTime
+        FROM radarStatus
+        WHERE IP = :ip
+          AND FileType = :file_type
+          AND FileTime >= :start_ts
+    """)
+
+    try:
+        with get_session("file_status") as session:
+            rows = session.execute(
+                sql.execution_options(timeout=timeout),
+                {"ip": ip, "file_type": file_type, "start_ts": start_ts},
+            ).fetchall()
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.error("get_radar_history: DB error: %s", sanitize_log(exc))
+        rows = []
+
+    # 同一個檔案可能因多個目錄（/data、/home/data、含/不含日期資料夾）重複記錄，
+    # 以 (時間, 變數) 去重並取最小 DiffTime（最早到位）。
+    best: dict[tuple[datetime, str], float] = {}
+    for row in rows:
+        if row.DiffTime is None:
+            continue
+        if fmt == "rb5":
+            parsed = _parse_rb5_filename(row.FileName)
+            if parsed is None:
+                continue
+            t, var = parsed
+        else:
+            t = _parse_nexrad_filename(row.FileName)
+            if t is None:
+                continue
+            var = file_type
+        key = (t, var)
+        diff_min = float(row.DiffTime) / 60.0
+        if key not in best or diff_min < best[key]:
+            best[key] = diff_min
+
+    variables: list[str] = []
+    seen: set[str] = set()
+    data = []
+    for (t, var), diff_min in sorted(best.items()):
+        if var not in seen:
+            seen.add(var)
+            variables.append(var)
+        data.append({
+            "time": t.isoformat() + "Z",
+            "variable": var,
+            "diff_time_minutes": diff_min,
+        })
+    # 變數順序固定（依名稱排序），讓 y=1,2,3… 與顏色在不同時間範圍下一致
+    variables.sort(key=str.lower)
+
+    return {
+        "file_type": file_type,
+        "ip": ip,
+        "range": range,
+        "format": fmt,
+        "variables": variables,
+        "threshold_yellow": t_yellow,
+        "threshold_orange": t_orange,
+        "threshold_red": t_red,
+        "data": data,
+    }
+
+
+# ── 衛星資料表（最近 N 筆） ──────────────────────────────────────────────
+
+# file_type → FileStatus 資料庫中的資料表。表名只來自此白名單，不接受使用者輸入。
+_SATELLITE_TABLES = {
+    "HIMA_TP": "satelliteHima_TP",
+    "HIMA_TN": "satelliteHima_TN",
+    "GK2A_XW": "satelliteGK2A_XW",
+}
+_SATELLITE_RECENT_ROWS = 10
+
+
+def satellite_table_for_file_type(file_type: str) -> Optional[str]:
+    return _SATELLITE_TABLES.get(file_type)
+
+
+def get_satellite_recent(file_type: str) -> Optional[dict]:
+    """Latest rows of the per-product satellite table (columns: Date, Time, one per band).
+
+    API endpoint: GET /api/v1/history/{file_type}/satellite
+    Returns None when file_type has no dedicated satellite table.
+    """
+    table = satellite_table_for_file_type(file_type)
+    if table is None:
+        return None
+
+    timeout = get_config().system.query_timeout_seconds
+    sql = text(f"""
+        SELECT *
+        FROM {table}
+        ORDER BY `Date` DESC, `Time` DESC
+        LIMIT :n
+    """)  # nosec — table name comes from the internal whitelist above
+
+    columns: list[str] = []
+    out_rows: list[dict] = []
+    try:
+        with get_session("file_status") as session:
+            result = session.execute(
+                sql.execution_options(timeout=timeout), {"n": _SATELLITE_RECENT_ROWS},
+            )
+            columns = list(result.keys())
+            fetched = result.fetchall()
+        for r in fetched:
+            rec = {}
+            for col, val in zip(columns, r):
+                if isinstance(val, timedelta):
+                    secs = int(val.total_seconds())
+                    val = f"{secs // 3600:02d}:{secs % 3600 // 60:02d}:{secs % 60:02d}"
+                elif hasattr(val, "isoformat"):
+                    val = val.isoformat()
+                rec[col] = val
+            out_rows.append(rec)
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.error("get_satellite_recent: DB error: %s", sanitize_log(exc))
+
+    return {"file_type": file_type, "table": table, "columns": columns, "rows": out_rows}
+
+
 def _server_time_iso(t) -> Optional[str]:
     """Normalise a ServerTime value to an ISO8601 string with UTC offset."""
     if t is None:

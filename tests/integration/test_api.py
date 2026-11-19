@@ -132,45 +132,45 @@ class TestGetInstruments:
         assert res.json()["instruments"] == []
 
 
-# ── PUT /api/v1/instruments/{file_type}/threshold ───────────
+# ── POST /api/v1/instruments/{file_type}/threshold ───────────
 
 class TestUpdateThreshold:
     """需求 5.5：三段閾值驗證與儀器存在性檢查"""
 
     def test_returns_422_for_negative_threshold(self):
-        """PUT 負數閾值回傳 422（需求 5.5，gt=0.0）"""
-        res = client.put(
+        """POST 負數閾值回傳 422（需求 5.5，gt=0.0）"""
+        res = client.post(
             "/api/v1/instruments/RADAR_A/threshold",
             json={"threshold_yellow": -1.0, "threshold_orange": 20.0, "threshold_red": 30.0},
         )
         assert res.status_code == 422
 
     def test_returns_422_for_zero_threshold(self):
-        """PUT 閾值=0 回傳 422（需求 5.5，gt=0.0）"""
-        res = client.put(
+        """POST 閾值=0 回傳 422（需求 5.5，gt=0.0）"""
+        res = client.post(
             "/api/v1/instruments/RADAR_A/threshold",
             json={"threshold_yellow": 0.0, "threshold_orange": 20.0, "threshold_red": 30.0},
         )
         assert res.status_code == 422
 
     def test_returns_404_for_nonexistent_file_type(self):
-        """PUT 不存在的 file_type 且 DB 回傳非空清單時回傳 404（需求 5.5）"""
+        """POST 不存在的 file_type 且 DB 回傳非空清單時回傳 404（需求 5.5）"""
         known_instruments = [_make_instrument_dict("RADAR_A")]
         with patch("backend.routers.instruments.list_instruments",
                    return_value=known_instruments):
-            res = client.put(
+            res = client.post(
                 "/api/v1/instruments/NONEXISTENT_TYPE/threshold",
                 json={"threshold_yellow": 15.0, "threshold_orange": 20.0, "threshold_red": 30.0},
             )
         assert res.status_code == 404
 
     def test_returns_200_for_valid_thresholds(self):
-        """PUT 有效三段閾值回傳 200 並原樣回傳設定值"""
+        """POST 有效三段閾值回傳 200 並原樣回傳設定值"""
         instruments = [_make_instrument_dict("RADAR_A")]
         with patch("backend.routers.instruments.list_instruments",
                    return_value=instruments), \
              patch("backend.routers.instruments.set_instrument_thresholds_direct") as mock_set:
-            res = client.put(
+            res = client.post(
                 "/api/v1/instruments/RADAR_A/threshold",
                 json={"threshold_yellow": 15.0, "threshold_orange": 20.0, "threshold_red": 30.0},
             )
@@ -186,64 +186,11 @@ class TestUpdateThreshold:
         """DB 不可用（list_instruments 回傳空）時允許更新任意 file_type（不回傳 404）"""
         with patch("backend.routers.instruments.list_instruments", return_value=[]), \
              patch("backend.routers.instruments.set_instrument_thresholds_direct"):
-            res = client.put(
+            res = client.post(
                 "/api/v1/instruments/ANY_TYPE/threshold",
                 json={"threshold_yellow": 5.0, "threshold_orange": 10.0, "threshold_red": 20.0},
             )
         assert res.status_code == 200
-
-
-# ── GET /api/v1/system/current ──────────────────────────────
-
-class TestSystemStatus:
-    """需求 6：電腦系統狀態端點"""
-
-    def test_returns_200_with_items(self):
-        """GET /api/v1/system/current 回傳 200（mock DB）"""
-        mock_data = [
-            {"ip": "192.168.1.1", "equipment_name": "Server A", "department": "wrs",
-             "load_1": 0.5, "load_5": 0.4, "load_15": 0.3, "memory_use": 60.0,
-             "cpu_alert": "normal", "memory_alert": "warning"}
-        ]
-        with patch("backend.routers.system.get_system_status", return_value=mock_data):
-            res = client.get("/api/v1/system/current")
-        assert res.status_code == 200
-        data = res.json()
-        assert "items" in data
-        assert len(data["items"]) == 1
-
-    def test_returns_200_with_empty_list_on_db_failure(self):
-        """DB 不可用時回傳 200 與空清單（不回傳 503）"""
-        with patch("backend.routers.system.get_system_status", return_value=[]):
-            res = client.get("/api/v1/system/current")
-        assert res.status_code == 200
-        assert res.json()["items"] == []
-
-
-# ── GET /api/v1/disk/current ────────────────────────────────
-
-class TestDiskStatus:
-    """需求 6：磁碟狀態端點"""
-
-    def test_returns_200_with_items(self):
-        """GET /api/v1/disk/current 回傳 200（mock DB）"""
-        mock_data = [
-            {"ip": "192.168.1.1", "file_system": "/dev/sda1", "used_pct": 55.0,
-             "equipment_name": "Server A", "department": "wrs", "disk_alert": "normal"}
-        ]
-        with patch("backend.routers.system.get_disk_status", return_value=mock_data):
-            res = client.get("/api/v1/disk/current")
-        assert res.status_code == 200
-        data = res.json()
-        assert "items" in data
-        assert len(data["items"]) == 1
-
-    def test_returns_200_with_empty_list_on_db_failure(self):
-        """DB 不可用時回傳 200 與空清單"""
-        with patch("backend.routers.system.get_disk_status", return_value=[]):
-            res = client.get("/api/v1/disk/current")
-        assert res.status_code == 200
-        assert res.json()["items"] == []
 
 
 # ── GET /api/v1/history/{file_type} ─────────────────────────

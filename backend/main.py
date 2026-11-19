@@ -9,14 +9,13 @@ import logging.handlers
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.routers.completeness import router as completeness_router
 from backend.routers.computers import router as computers_router
 from backend.routers.history import router as history_router
 from backend.routers.instruments import router as instruments_router
-from backend.routers.system import router as system_router
+from backend.routers.radar_notices import router as radar_notices_router
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -147,16 +146,11 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(completeness_router)
 app.include_router(computers_router)
 app.include_router(instruments_router)
-app.include_router(system_router)
 app.include_router(history_router)
-
-# Redirect root URL to the instruments page
-@app.get("/", include_in_schema=False)
-async def root_redirect() -> RedirectResponse:
-    return RedirectResponse(url="/instruments.html")
-
+app.include_router(radar_notices_router)
 
 # Serve frontend static files
+# 根路徑 "/" 由 StaticFiles(html=True) 直接提供 frontend/index.html（首頁）。
 _FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 if _FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(_FRONTEND_DIR), html=True), name="frontend")
